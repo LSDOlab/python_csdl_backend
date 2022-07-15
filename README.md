@@ -2,7 +2,10 @@
 
 Repository for new CSDL backend.
 
-replace csdl_om with python_csdl_backend
+replace csdl_om with python_csdl_backend.
+
+list of features not yet implemented:
+https://docs.google.com/spreadsheets/d/1WWdCow1ZNf7Tx5pk0ql7nIZ5cehOLWBe8dN6LLhGJ0A/edit?usp=sharing 
 
 ```Python
 import csdl
@@ -43,9 +46,6 @@ totals = sim.compute_totals(of=['f'], wrt=['x2', 'x1'])
 print('\nderivatives:')
 for key in totals:
     print(key, '=', totals[key])
-
-# check totals:
-# sim.check_partials(compact_print=True) # should use check_totals normally.
 
 
 ```
