@@ -353,9 +353,6 @@ class SystemGraph(object):
         for input_name in input_ids:
             instruction_name += f'{input_name},'
         rev_block = CodeBlock(instruction_name)
-        # rev_block.write('fma_time = 0')
-        # rev_block.write('import time')
-        # rev_block.write('start_total = time.time()')
 
         # Static variables
         prerev_vars = {}
@@ -742,10 +739,6 @@ class SystemGraph(object):
                 current_op_num,
                 self.num_ops,
                 True)
-        # rev_block.write('total_time = time.time() - start_total')
-        # rev_block.write('print(\'FMA: \',fma_time)')
-        # rev_block.write('print(\'TOTAL: \',total_time)')
-        # rev_block.write('print(\'RATIO: \',fma_time/total_time)')
 
         return rev_block, prerev_vars
 
