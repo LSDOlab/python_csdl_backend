@@ -55,7 +55,8 @@ class CustomExplicitLite(OperationBase):
 
         for i, output in enumerate(self.ordered_out_names):
 
-            eval_block.write(f'{self.get_output_id(output)} = temp[{i}]')
+            out_name = self.get_output_id(output)
+            eval_block.write(f'{out_name} = temp[{i}]')
 
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
 
@@ -134,6 +135,8 @@ class CustomExplicitWrapper():
                 self.use_compute_jacvec = False
             else:
                 self.use_compute_jacvec = False
+
+        # print(self.use_compute_jacvec, self.op.name)
 
         self.jac_is_function = self.use_compute_jacvec
 

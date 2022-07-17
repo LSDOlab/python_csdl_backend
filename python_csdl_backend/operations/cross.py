@@ -111,11 +111,6 @@ class CrossLite(OperationBase):
 
                     tmps = {0: None, 1: None, 2: None}
                     for ind in range(3):
-                        array = np.einsum(
-                            '...,m->...m',
-                            np.ones(self.shape_without_axis),
-                            eye[ind, :],
-                        )
 
                         array = np.einsum(
                             '...,m->...m',
@@ -157,11 +152,6 @@ class CrossLite(OperationBase):
 
                     tmps = {0: None, 1: None, 2: None}
                     for ind in range(3):
-                        array = np.einsum(
-                            '...,m->...m',
-                            np.ones(self.shape_without_axis),
-                            eye[ind, :],
-                        )
 
                         array = np.einsum(
                             '...,m->...m',
@@ -195,6 +185,15 @@ class CrossLite(OperationBase):
             vars[func_name] = compute_cross_jac
 
             partials_block.write(f'{partial_name} = {func_name}({self.get_input_id(self.in1_name)}, {self.get_input_id(self.in2_name)})')
+
+    def determine_sparse(self):
+        # in1_sparsity = len(self.rows1)/(self.outsize*self.insize)
+        # in2_sparsity = len(self.rows2)/(self.outsize*self.insize)
+
+        if (self.outsize > 100) and (self.insize > 100):
+            # print(in1_sparsity, in2_sparsity, self.outsize, self.insize)
+            return True
+        return False
 
 
 def get_array_indices(*shape):

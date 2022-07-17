@@ -90,6 +90,19 @@ class ExpandArrayLite(OperationBase):
         else:
             vars[partial_name] = sp.csc_matrix((val, (self.rows, self.cols)), shape=(sizeout, size))
 
+    def determine_sparse(self):
+
+        size = np.prod(self.invar.shape)
+        sizeout = np.prod(self.outvar.shape)
+        if (size*sizeout) < 10000:
+            return False
+
+        if len(self.rows)/(size*sizeout) < 0.66:
+            return True
+        else:
+            return False
+
+
 
 class ExpandScalarLite(OperationBase):
     def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):

@@ -4,7 +4,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.general_utils import get_deriv_name, to_list, get_path_name, increment_id
+from python_csdl_backend.utils.general_utils import get_deriv_name, to_list, get_path_name, increment_id, lineup_string
 from python_csdl_backend.core.operation_map import (
     get_backend_op,
     get_backend_implicit_op,
@@ -45,6 +45,7 @@ class SystemGraph(object):
         self.objective = objective
         self.constraints = constraints
         self.opt_bool = opt_bool
+        self.num_ops = 0
 
         self.process_rep()
         # exit()
@@ -128,7 +129,7 @@ class SystemGraph(object):
                         self.constraints[promoted_id]['node'] = node
 
             elif isinstance(node, OperationNode):
-
+                self.num_ops += 1
                 op = node.op
 
                 if len(op.dependencies) != len(list(self.eval_graph.predecessors(node))):
@@ -335,6 +336,14 @@ class SystemGraph(object):
         output_ids = to_list(output_ids)
         input_ids = to_list(input_ids)
 
+        max_outstr_len = 0
+        for out_id_temp in output_ids:
+            output_node = self.unique_to_node[out_id_temp]
+            output_lang_name_temp = output_node.name
+
+            if len(f'{output_lang_name_temp}-->') > max_outstr_len:
+                max_outstr_len = len(f'{output_lang_name_temp}-->')
+
         # initialize instructions
         # name of instructions
         instruction_name = 'REV:'
@@ -370,6 +379,7 @@ class SystemGraph(object):
 
             # Get output shape
             output_node = self.unique_to_node[out_id]
+            output_lang_name = output_node.name
             output_shape = output_node.var.shape
             output_size = np.prod(output_shape)
 
@@ -383,6 +393,12 @@ class SystemGraph(object):
             # Get all ancestors of output for checking.
             output_descendants = list(nx.descendants(self.rev_graph, output_node))
 
+            # prepare string:
+            out_str = lineup_string(f'{output_lang_name}-->', max_outstr_len)
+            stride = round(self.num_ops/40)
+            if stride == 0:
+                stride = 1
+
             # --------- perform BFS --------- :
             # Implement *modified* Breadth First Search
             # - Do not search down a node until ALL* edges leading into it has been search as well
@@ -395,7 +411,7 @@ class SystemGraph(object):
             # If so, do not perform BFS on it as there is nothing to search through.
             if not output_descendants:
                 queue = []
-
+            current_op_num = 0
             while queue:
                 # search downstream of node 'current'
                 # Node 'current' HAS to be a variable
@@ -451,6 +467,22 @@ class SystemGraph(object):
                 # if program reaches here, middle_operation has been fully visited so we now process it
                 processed_operations.add(middle_operation)
 
+                # cool print statements:
+                current_op_num += 1
+                # if current_op_num == 1:
+                #     print_loading(
+                #         out_str,
+                #         current_op_num,
+                #         self.num_ops,
+                #         False)
+
+                # if (current_op_num) % stride == 0:
+                #     print_loading(
+                #         out_str,
+                #         current_op_num,
+                #         self.num_ops,
+                #         False)
+
                 # :::::GENERATE CODE FOR MIDDLE_OPERATION:::::
                 # Two things to do:
                 # 1) Compute partials of the operation.
@@ -494,6 +526,8 @@ class SystemGraph(object):
                         # compute_partials for each input and output
                         if self.sparsity_type == 'auto':
                             is_sparse_jac = backend_op.determine_sparse()
+                            if is_sparse_jac is None:
+                                raise ValueError(f'Dev error. is_sparse_jac is None for {backend_op}')
                         elif self.sparsity_type == 'sparse':
                             is_sparse_jac = True
                         elif self.sparsity_type == 'dense':
@@ -502,18 +536,18 @@ class SystemGraph(object):
                             raise ValueError('is_sparse_jac is not one of auto, scipy, numpy')
 
                         # PRINT:
-                        # pred_size = 0
-                        # for predecessor in self.rev_graph.predecessors(middle_operation):
-                        #     if np.prod(predecessor.var.shape) > pred_size:
-                        #         pred_size = np.prod(predecessor.var.shape)
-                        # succ_size = 0
-                        # for successor in self.rev_graph.successors(middle_operation):
-                        #     if np.prod(successor.var.shape) > succ_size:
-                        #         succ_size = np.prod(successor.var.shape)
-                        # if pred_size > 100 or succ_size > 100 and not is_sparse_jac:
-                        #     print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
-                        # elif (pred_size < 100 and succ_size < 100) and is_sparse_jac:
-                        #     print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
+                        pred_size = 0
+                        for predecessor in self.rev_graph.predecessors(middle_operation):
+                            if np.prod(predecessor.var.shape) > pred_size:
+                                pred_size = np.prod(predecessor.var.shape)
+                        succ_size = 0
+                        for successor in self.rev_graph.successors(middle_operation):
+                            if np.prod(successor.var.shape) > succ_size:
+                                succ_size = np.prod(successor.var.shape)
+                        if (pred_size > 100 and succ_size > 100) and not is_sparse_jac:
+                            print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
+                        elif (pred_size < 100 and succ_size < 100) and is_sparse_jac:
+                            print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
 
                         backend_op.get_partials(partials_dict, partials_block, vars, is_sparse_jac)
 
@@ -702,12 +736,32 @@ class SystemGraph(object):
                     input_size = np.prod(self.unique_to_node[input_id].var.shape)
                     prerev_vars[totals_name] = np.zeros((output_size, input_size))
 
-            # print('akdjfn')
-            # print(input_ids)
-            # exit()
+            # print statement
+            print_loading(
+                out_str,
+                current_op_num,
+                self.num_ops,
+                True)
         # rev_block.write('total_time = time.time() - start_total')
         # rev_block.write('print(\'FMA: \',fma_time)')
         # rev_block.write('print(\'TOTAL: \',total_time)')
         # rev_block.write('print(\'RATIO: \',fma_time/total_time)')
 
         return rev_block, prerev_vars
+
+
+def print_loading(
+        output_str,
+        current_op_num,
+        total_op_num,
+        start=False):
+    dots = '.'*round(40*(current_op_num/total_op_num))
+    dot_str = lineup_string(dots, 40)
+
+    ratio_str = lineup_string(
+        f'({current_op_num}/{total_op_num})',
+        len(f'({total_op_num}/{total_op_num})'))
+    if start:
+        print(f'{output_str} {ratio_str} |{dot_str}|')
+    else:
+        print(f'{output_str} {ratio_str} |{dot_str}|', end="\r")

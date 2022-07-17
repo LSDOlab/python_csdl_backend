@@ -45,6 +45,7 @@ class Simulator(SimulatorBase):
 
         """
         self.display_scripts = display_scripts
+        self.recorder = None
 
         # check modes
         self.mode = mode
@@ -206,6 +207,14 @@ class Simulator(SimulatorBase):
         eval_vars = {**states, **self.preeval_vars}
         new_states = self.eval_instructions.execute(eval_vars)
 
+        if self.recorder:
+
+            save_dict = {}
+            for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
+                print(var_name)
+                save_dict[var_name] = new_states[self._find_unique_id(var_name)]
+
+            self.recorder.record(save_dict, 'simulator')
         return new_states
 
     def _generate_totals(self, of, wrt):
@@ -519,6 +528,8 @@ class Simulator(SimulatorBase):
         # print
         max_key_len = 0
         max_rel_len = 0
+        max_calc_len = len('calc norm')
+        max_abs_len = 0
         for key in error_dict:
             key_str = str(key)
             if len(key_str) > max_key_len:
@@ -527,25 +538,45 @@ class Simulator(SimulatorBase):
             rel_error_str = str(error_dict[key]['relative_error_norm'])
             if len(rel_error_str) > max_rel_len:
                 max_rel_len = len(rel_error_str)
+
+            calc_norm_str = str(error_dict[key]['analytical_norm'])
+            if len(calc_norm_str) > max_calc_len:
+                max_calc_len = len(calc_norm_str)
+
+            abs_error_str = str(error_dict[key]['abs_error_norm'])
+            if len(abs_error_str) > max_abs_len:
+                max_abs_len = len(abs_error_str)
+
         max_key_len += 5
         max_rel_len += 5
+        max_calc_len += 5
 
         if compact_print:
             print()
 
+            error_bar = '-'*(max_key_len+max_rel_len+max_calc_len+max_abs_len)
             of_wrt_str = lineup_string('(of,wrt)', max_key_len)
-            print(f'{of_wrt_str}relative errorabsolute error')
-            print(f'----------------------------------------------------')
+            rel_error_title = lineup_string('relative error', max_rel_len)
+            computed_norm_title = lineup_string('calc norm', max_calc_len)
+
+            print(f'{of_wrt_str}{computed_norm_title}{rel_error_title}absolute error')
+
+            # --------------------------------------
+            print(error_bar)
             for key in error_dict:
 
                 key_str = lineup_string(str(key), max_key_len)
+
+                calc_norm = error_dict[key]['analytical_norm']
+                calc_norm_str = lineup_string(str(calc_norm), max_calc_len)
 
                 rel_error = error_dict[key]['relative_error_norm']
                 rel_error_str = lineup_string(str(rel_error), max_rel_len)
 
                 abs_error = error_dict[key]['abs_error_norm']
-                print(f'{key_str}{rel_error_str}{abs_error}')
-            print(f'----------------------------------------------------')
+                print(f'{key_str}{calc_norm_str}{rel_error_str}{abs_error}')
+            print(error_bar)
+            # --------------------------------------
             print()
         else:
             print()
@@ -638,18 +669,26 @@ class Simulator(SimulatorBase):
             self.total_constraint_size += c_size
             c_dict['index_upper'] = self.total_constraint_size
 
-            if not c_dict['lower']:
+            if c_dict['lower'] is None:
                 c_dict['lower'] = np.ones(c_shape)*(-1.0e30)
-            if not c_dict['upper']:
+            if c_dict['upper'] is None:
                 c_dict['upper'] = np.ones(c_shape)*(1.0e30)
 
     def get_design_variable_metadata(self):
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
         return self.dvs
 
     def get_constraints_metadata(self):
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
         return self.cvs
 
     def update_design_variables(self, x):
+
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
+
         for dv_name, dv_dict in self.dvs.items():
             i_lower = dv_dict['index_lower']
             i_upper = dv_dict['index_upper']
@@ -664,6 +703,9 @@ class Simulator(SimulatorBase):
         computes derivatives of objective/constraints wrt design variables.
         """
 
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
+
         self.optimization_derivatives = self.compute_totals(
             of=self.output_keys,
             wrt=self.dv_keys,
@@ -675,6 +717,9 @@ class Simulator(SimulatorBase):
         """
         return objective variable value.
         """
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
+
         obj_name = self.obj['name']
         return self[obj_name]
 
@@ -682,6 +727,9 @@ class Simulator(SimulatorBase):
         """
         return constraint variable value.
         """
+
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
 
         constraint_vec = np.zeros(self.total_constraint_size)
         for c_name, c_dict in self.cvs.items():
@@ -695,6 +743,10 @@ class Simulator(SimulatorBase):
         return constraint_vec
 
     def design_variables(self):
+
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
+
         dv_vec = np.zeros(self.total_dv_size)
         for dv_name, dv_dict in self.dvs.items():
             i_lower = dv_dict['index_lower']
@@ -707,6 +759,9 @@ class Simulator(SimulatorBase):
         return dv_vec
 
     def objective_gradient(self):
+
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
 
         obj_gradient = np.zeros(self.total_dv_size)
         obj_name = self.obj['name']
@@ -723,6 +778,9 @@ class Simulator(SimulatorBase):
 
     def constraint_jacobian(self):
 
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
+
         constraint_jac = np.zeros((self.total_constraint_size, self.total_dv_size))
         for c_name, c_dict in self.cvs.items():
             i_lower_c = c_dict['index_lower']
@@ -730,7 +788,7 @@ class Simulator(SimulatorBase):
             for dv_name, dv_dict in self.dvs.items():
                 i_lower_dv = dv_dict['index_lower']
                 i_upper_dv = dv_dict['index_upper']
-                constraint_jac[i_lower_c:i_upper_c, i_lower_dv:i_upper_dv] = self.optimization_derivatives[c_name, dv_name].flatten()
+                constraint_jac[i_lower_c:i_upper_c, i_lower_dv:i_upper_dv] = self.optimization_derivatives[c_name, dv_name]
         return constraint_jac
 
     def check_partials(self,
@@ -780,3 +838,17 @@ class Simulator(SimulatorBase):
                 result[key]['relative_error_norm'],
                 0.0,
                 decimal=5)
+
+    def add_recorder(self, recorder):
+        """
+        For dashboard.
+        """
+        self.recorder = recorder
+
+    def check_if_optimization(self, opt_bool):
+        """
+        raise error if opt_bool == False
+        """
+
+        if not opt_bool:
+            raise KeyError('given representation does not specify design variables and an objective.')

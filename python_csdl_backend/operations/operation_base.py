@@ -237,6 +237,8 @@ class OperationBase():
         returns true or false depending on whether the jacobian(s) are sparse or dense.
         True --> use scipy sparse matrix for jacobian
         False --> use numpy array for jacobian
+
+        default is False
         """
 
         # default return False

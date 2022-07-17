@@ -17,7 +17,7 @@ class IndexedPassthroughLite(OperationBase):
 
     def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):
         op_name = 'indexed_passthrough'
-        name = f'{name} {op_name}'
+        name = f'{name}_{op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
 
         self.out_name = get_only(self.nx_outputs_dict)
@@ -39,12 +39,12 @@ class IndexedPassthroughLite(OperationBase):
         # vars[self.out_name_temp] = self.out_val.reshape((self.out_shape))
         vars[self.out_name_temp] = self.out_val
         for in_name_lang, (shape, tgt_indices) in self.indices.items():
-            
+
             # print('tgt_indice', tgt_indices)
             in_name = self.get_input_id(in_name_lang)
             i = np.unravel_index(tgt_indices, self.out_shape)
-            vars[f'i_{in_name}'] = np.unravel_index(tgt_indices, self.out_shape)
-            eval_block.write(f'{self.out_name_temp}[i_{in_name}] = {in_name}.flatten()')
+            vars[f'i_{in_name}_{self.name}'] = np.unravel_index(tgt_indices, self.out_shape)
+            eval_block.write(f'{self.out_name_temp}[i_{in_name}_{self.name}] = {in_name}.flatten()')
             eval_block.write(f'{self.out_name} = {self.out_name_temp}.copy()')
 
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
