@@ -319,6 +319,7 @@ class SystemGraph(object):
 
         return eval_block, preeval_vars, state_vals, variable_info
 
+    # @profile
     def generate_reverse(self, output_ids, input_ids):
         '''
         generate the reverse mode derivative evaluation script.
@@ -336,6 +337,13 @@ class SystemGraph(object):
         output_ids = to_list(output_ids)
         input_ids = to_list(input_ids)
 
+        # dictionary of ALL predecessor nodes of inputs
+        # input_ancestors: input id --> set(nodes)
+        input_ancestors = {}
+        for input_id in input_ids:
+            input_ancestors[input_id] = set(nx.ancestors(self.rev_graph, self.unique_to_node[input_id]))
+
+        # getting print statements ready
         max_outstr_len = 0
         for out_id_temp in output_ids:
             output_node = self.unique_to_node[out_id_temp]
@@ -388,7 +396,7 @@ class SystemGraph(object):
             processed_operations = set()
 
             # Get all ancestors of output for checking.
-            output_descendants = list(nx.descendants(self.rev_graph, output_node))
+            output_descendants = set(nx.descendants(self.rev_graph, output_node))
 
             # prepare string:
             out_str = lineup_string(f'{output_lang_name}-->', max_outstr_len)
@@ -533,18 +541,18 @@ class SystemGraph(object):
                             raise ValueError('is_sparse_jac is not one of auto, scipy, numpy')
 
                         # PRINT:
-                        pred_size = 0
-                        for predecessor in self.rev_graph.predecessors(middle_operation):
-                            if np.prod(predecessor.var.shape) > pred_size:
-                                pred_size = np.prod(predecessor.var.shape)
-                        succ_size = 0
-                        for successor in self.rev_graph.successors(middle_operation):
-                            if np.prod(successor.var.shape) > succ_size:
-                                succ_size = np.prod(successor.var.shape)
-                        if (pred_size > 100 and succ_size > 100) and not is_sparse_jac:
-                            print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
-                        elif (pred_size < 100 and succ_size < 100) and is_sparse_jac:
-                            print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
+                        # pred_size = 0
+                        # for predecessor in self.rev_graph.predecessors(middle_operation):
+                        #     if np.prod(predecessor.var.shape) > pred_size:
+                        #         pred_size = np.prod(predecessor.var.shape)
+                        # succ_size = 0
+                        # for successor in self.rev_graph.successors(middle_operation):
+                        #     if np.prod(successor.var.shape) > succ_size:
+                        #         succ_size = np.prod(successor.var.shape)
+                        # if (pred_size > 100 and succ_size > 100) and not is_sparse_jac:
+                        #     print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
+                        # elif (pred_size < 100 and succ_size < 100) and is_sparse_jac:
+                        #     print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
 
                         backend_op.get_partials(partials_dict, partials_block, vars, is_sparse_jac)
 
@@ -618,7 +626,8 @@ class SystemGraph(object):
                     for input_id in input_ids:
                         if input_id == successor.id:
                             ignore_successor = False
-                        elif nx.has_path(self.rev_graph, successor, self.unique_to_node[input_id]):
+                        elif successor in input_ancestors[input_id]:
+                            # elif nx.has_path(self.rev_graph, successor, self.unique_to_node[input_id]):
                             ignore_successor = False
                     if ignore_successor:
                         continue
