@@ -40,16 +40,6 @@ class LinearCombinationLite(OperationBase):
         for in_name, coeff in zip(self.in_names, self.coeffs):
             eval_block.write(f'+{coeff}*{self.get_input_id(in_name)}', linebreak=False)
 
-        # print tools
-        # for in_name, coeff in zip(self.in_names, self.coeffs):
-        #     eval_block.write(f'print(\'{self.get_input_id(in_name)}\',{self.get_input_id(in_name)}.shape)')
-        # eval_block.write(f'print(\'{self.get_output_id(self.out_name)}\',{self.get_output_id(self.out_name)}.shape)')
-        # eval_block.write(f'print(\'{self.get_output_id(self.out_name)}\',{self.get_output_id(self.out_name)}.shape)')
-        # if self.get_output_id(self.out_name) == 'v01098_delta_e_full':
-        #     eval_block.write(f'print({const_name}.shape)')
-        #     eval_block.write(f'print({self.get_output_id(self.out_name)}.shape)')
-        #     eval_block.write(f'print({self.get_input_id(self.in_names[0])}.shape)')
-
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
 
         for key_tuple in partials_dict:
@@ -61,10 +51,16 @@ class LinearCombinationLite(OperationBase):
             coeff = self.coeffs[self.in_names.index(lang_input)]
             size = self.input_size
 
-            if is_sparse_jac:
-                vars[partial_name] = sp.eye(size, format='csc')*coeff
-            else:
-                vars[partial_name] = np.eye(size)*coeff
+            # OLD
+            # if is_sparse_jac:
+            #     vars[partial_name] = sp.eye(size, format='csc')*coeff
+            # else:
+            #     vars[partial_name] = np.eye(size)*coeff
+
+            # NEW: 
+            # only return diag values for elementwise
+            # Also sparsity doesn't matter
+            vars[partial_name] = np.ones(size)*coeff
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)

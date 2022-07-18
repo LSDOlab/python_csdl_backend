@@ -93,11 +93,17 @@ class PowerCombinationLite(OperationBase):
                     else:
                         partials_block.write(f'*{a}*({self.get_input_id(in_name)}**{b})', linebreak=False)
 
-            if is_sparse_jac:
-                partials_block.write(f'{partial_name} = sp.csc_matrix((temp_power.flatten(), ({partial_ind_name},{partial_ind_name})))')
-            else:
-                partials_block.write(f'{partial_name}[{partial_name}_inds,{partial_name}_inds]  = temp_power.flatten()')
-                # partials_block.write(f'{partial_name}  = np.diagflat(temp_power.flatten())')
+            # OLD
+            # if is_sparse_jac:
+            #     partials_block.write(f'{partial_name} = sp.csc_matrix((temp_power.flatten(), ({partial_ind_name},{partial_ind_name})))')
+            # else:
+            #     partials_block.write(f'{partial_name}[{partial_name}_inds,{partial_name}_inds]  = temp_power.flatten()')
+            #     # partials_block.write(f'{partial_name}  = np.diagflat(temp_power.flatten())')
+
+            # NEW:
+            # only return diag values for elementwise
+            # Also sparsity doesn't matter
+            partials_block.write(f'{partial_name} = temp_power.flatten()')
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)

@@ -28,6 +28,7 @@ class OperationBase():
         self.nx_outputs_dict = nx_outputs
         self.jac_is_function = False
         self.op_summary_block = CodeBlock(add_name=False)
+        self.elementwise = operation.properties['elementwise']
 
         # map to landuage variable and representation variable
         self.input_csdl_to_rep = {}

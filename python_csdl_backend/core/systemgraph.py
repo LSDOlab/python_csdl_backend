@@ -11,6 +11,7 @@ from python_csdl_backend.core.operation_map import (
     get_backend_custom_explicit_op,
     get_backend_custom_implicit_op,
 )
+from python_csdl_backend.core.accumulation_operations import diag_mult
 
 from csdl import Operation, StandardOperation, ImplicitOperation, CustomExplicitOperation, Variable, Output, BracketedSearchOperation, CustomImplicitOperation
 from csdl.rep.variable_node import VariableNode
@@ -158,6 +159,8 @@ class SystemGraph(object):
 
         # initialize return dict
         operation_analytics = {}
+        operation_analytics['elementwise'] = {}
+        operation_analytics['elementwise']['count'] = 0
 
         # Write to text file
         with open(filename, 'w') as f:
@@ -191,6 +194,10 @@ class SystemGraph(object):
             # keep a count of every type of node in the graph for printing
             if isinstance(node, OperationNode):
                 csdl_node = node.op
+
+                if isinstance(csdl_node, StandardOperation):
+                    if csdl_node.properties['elementwise']:
+                        operation_analytics['elementwise']['count'] += 1
             else:
                 csdl_node = node.var
 
@@ -365,6 +372,9 @@ class SystemGraph(object):
         # Static variables
         prerev_vars = {}
 
+        # accumulation operations
+        prerev_vars['DIAG_MULT'] = diag_mult
+
         # Keep track of which partials have already been computed.
         # We only need to compute partial jacobians once no matter how many
         # derivatives we are computing
@@ -529,16 +539,7 @@ class SystemGraph(object):
                         vars = {}
 
                         # compute_partials for each input and output
-                        if self.sparsity_type == 'auto':
-                            is_sparse_jac = backend_op.determine_sparse()
-                            if is_sparse_jac is None:
-                                raise ValueError(f'Dev error. is_sparse_jac is None for {backend_op}')
-                        elif self.sparsity_type == 'sparse':
-                            is_sparse_jac = True
-                        elif self.sparsity_type == 'dense':
-                            is_sparse_jac = False
-                        else:
-                            raise ValueError('is_sparse_jac is not one of auto, scipy, numpy')
+                        is_sparse_jac = get_operation_sparsity(backend_op, self.sparsity_type)
 
                         # PRINT:
                         # pred_size = 0
@@ -656,7 +657,8 @@ class SystemGraph(object):
                             # If this is the first iteration in BFS, we need to set seed for output
                             if predecessor == output_node:
                                 # The line below had issues with pointers.
-                                rev_block.write(f'{path_successor} = {partials_name}.copy()')
+                                initialized_path_string = get_init_path_string(partials_name, backend_op, self.sparsity_type)
+                                rev_block.write(f'{path_successor} = {initialized_path_string}')
                                 initialized_paths.add(path_successor)
                                 continue
 
@@ -665,7 +667,12 @@ class SystemGraph(object):
                                 raise ValueError(f'path {path_current} has not yet been computed.')
 
                             # Now we write the path accumulation
-                            successor_string = f'{path_current}@{partials_name}'
+                            # successor_string = f'{path_current}@{partials_name}'
+
+                            # is either
+                            # successor_string = 'path_current@partials_name'
+                            # successor_string = 'DIAG_MULT(path_current, partials_name)'
+                            successor_string = get_successor_path_string(path_current, partials_name, backend_op)
 
                             if path_successor not in initialized_paths:
                                 # if path_successor not yet initialized, set it.
@@ -767,3 +774,53 @@ def print_loading(
         print(f'{output_str} {ratio_str} |{dot_str}|')
     else:
         print(f'{output_str} {ratio_str} |{dot_str}|', end="\r")
+
+
+def get_successor_path_string(
+        path_current,
+        partials_name,
+        backend_op):
+    """
+    returns matrix multiplication or diagonal multiplication depending on elementwise operations or not
+    """
+
+    if backend_op.elementwise:
+        # specialized diagonal multiplication
+        return f'DIAG_MULT({path_current},{partials_name})'
+    else:
+        # standard multiplication
+        return f'{path_current}@{partials_name}'
+
+
+def get_init_path_string(partials_name, backend_op, sparsity_type):
+    """
+    returns the string to set initial 'seed' derivative of output
+    """
+    # print(backend_op.elementwise, backend_op)
+    if not backend_op.elementwise:
+        return f'{partials_name}.copy()'
+    else:
+        is_sparse = get_operation_sparsity(backend_op, sparsity_type)
+
+        if is_sparse:
+            return f'sp.diags({partials_name}, format = \'csc\')'
+        else:
+            return f'np.diagflat({partials_name})'
+
+
+def get_operation_sparsity(backend_op, sparsity_type):
+    """
+    returns True or False on whether operation partials should be sparse or dense
+    """
+    if sparsity_type == 'auto':
+        is_sparse_jac = backend_op.determine_sparse()
+        if is_sparse_jac is None:
+            raise ValueError(f'dev error. is_sparse_jac is None for {backend_op}')
+    elif sparsity_type == 'sparse':
+        is_sparse_jac = True
+    elif sparsity_type == 'dense':
+        is_sparse_jac = False
+    else:
+        raise ValueError('is_sparse_jac is not one of auto, sparse, dense')
+
+    return sparsity_type
