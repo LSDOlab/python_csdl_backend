@@ -126,7 +126,6 @@ class Simulator(SimulatorBase):
 
         #  ----------- create model evaluation script -----------
         self.eval_instructions = Instructions(f'RUN_MODEL{self.rep}')
-        # self.eval_instructions.script.write('import numpy as np')
 
         # This line basically creates the mode evaluation graph
         eval_block, self.preeval_vars, state_vals_extracted, variable_info = self.system_graph.generate_evaluation()

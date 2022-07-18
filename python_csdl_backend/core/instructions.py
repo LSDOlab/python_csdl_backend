@@ -16,7 +16,7 @@ class Instructions():
                 name of the code subblock
         """
 
-        self.name = 'Instructions: ' + name
+        self.name = 'Instructions_' + name
         self.script = CodeBlock(name)
 
     def compile(self):

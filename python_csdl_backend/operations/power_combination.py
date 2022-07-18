@@ -84,11 +84,11 @@ class PowerCombinationLite(OperationBase):
                 if b == 0.0:
                     partials_block.write(f'*{a}', linebreak=False)
                 else:
-                    if (a == 1.) and (b == 1.):
+                    if (a == 1.) and ((b == 1.) or (b == 1)):
                         partials_block.write(f'*({self.get_input_id(in_name)})', linebreak=False)
                     elif a == 1.:
                         partials_block.write(f'*({self.get_input_id(in_name)}**{b})', linebreak=False)
-                    elif b == 1.:
+                    elif ((b == 1.) or (b == 1)):
                         partials_block.write(f'*{a}*({self.get_input_id(in_name)})', linebreak=False)
                     else:
                         partials_block.write(f'*{a}*({self.get_input_id(in_name)}**{b})', linebreak=False)
@@ -97,6 +97,7 @@ class PowerCombinationLite(OperationBase):
                 partials_block.write(f'{partial_name} = sp.csc_matrix((temp_power.flatten(), ({partial_ind_name},{partial_ind_name})))')
             else:
                 partials_block.write(f'{partial_name}[{partial_name}_inds,{partial_name}_inds]  = temp_power.flatten()')
+                # partials_block.write(f'{partial_name}  = np.diagflat(temp_power.flatten())')
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)

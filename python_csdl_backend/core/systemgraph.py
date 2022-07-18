@@ -474,19 +474,19 @@ class SystemGraph(object):
 
                 # cool print statements:
                 current_op_num += 1
-                # if current_op_num == 1:
-                #     print_loading(
-                #         out_str,
-                #         current_op_num,
-                #         self.num_ops,
-                #         False)
+                if current_op_num == 1:
+                    print_loading(
+                        out_str,
+                        current_op_num,
+                        self.num_ops,
+                        False)
 
-                # if (current_op_num) % stride == 0:
-                #     print_loading(
-                #         out_str,
-                #         current_op_num,
-                #         self.num_ops,
-                #         False)
+                if (current_op_num) % stride == 0:
+                    print_loading(
+                        out_str,
+                        current_op_num,
+                        self.num_ops,
+                        False)
 
                 # :::::GENERATE CODE FOR MIDDLE_OPERATION:::::
                 # Two things to do:
