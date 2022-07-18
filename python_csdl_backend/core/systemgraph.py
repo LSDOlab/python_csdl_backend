@@ -823,4 +823,4 @@ def get_operation_sparsity(backend_op, sparsity_type):
     else:
         raise ValueError('is_sparse_jac is not one of auto, sparse, dense')
 
-    return sparsity_type
+    return is_sparse_jac
