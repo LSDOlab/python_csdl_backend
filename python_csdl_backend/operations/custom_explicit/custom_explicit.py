@@ -25,6 +25,9 @@ class CustomExplicitLite(OperationBase):
     def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):
         op_name = 'custom_explicit'
         name = f'{name}_{op_name}'
+        operation.properties = {}
+        operation.properties['elementwise'] = False
+        # operation.properties = {}
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
 
         self.ordered_in_names = operation.input_meta

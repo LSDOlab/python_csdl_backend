@@ -3,8 +3,8 @@ numpy_class = np.ndarray
 
 # Performs multiplication of elementwise operations.
 def diag_mult(path_to, diag_vals):
-    # if len(diag_vals.shape) != 1:
-    #     raise ValueError('wrong shape')
+    if len(diag_vals.shape) != 1:
+        raise ValueError('wrong shape')
 
     # print(diag_vals.shape,path_to.shape)
     # print(type(diag_vals), type(path_to))

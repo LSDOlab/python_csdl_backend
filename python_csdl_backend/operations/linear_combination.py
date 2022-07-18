@@ -51,7 +51,7 @@ class LinearCombinationLite(OperationBase):
             coeff = self.coeffs[self.in_names.index(lang_input)]
             size = self.input_size
 
-            # OLD
+            # OLD FULL JACOBIAN
             # if is_sparse_jac:
             #     vars[partial_name] = sp.eye(size, format='csc')*coeff
             # else:

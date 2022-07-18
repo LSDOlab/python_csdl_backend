@@ -41,10 +41,16 @@ class PrintVarLite(OperationBase):
         output = key_tuple[0].id
         partial_name = partials_dict[key_tuple]['name']
 
-        if is_sparse_jac:
-            vars[partial_name] = sp.eye(self.input_size, format='csc')
-        else:
-            vars[partial_name] = np.eye(self.input_size)
+        # OLD FULL JACOBIAN
+        # if is_sparse_jac:
+        #     vars[partial_name] = sp.eye(self.input_size, format='csc')
+        # else:
+        #     vars[partial_name] = np.eye(self.input_size)
+
+        # NEW: 
+        # only return diag values for elementwise
+        # Also sparsity doesn't matter
+        vars[partial_name] = np.ones(self.input_size)
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)

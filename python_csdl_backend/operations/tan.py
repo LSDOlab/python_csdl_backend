@@ -37,11 +37,17 @@ class TanLite(OperationBase):
         output = key_tuple[0].id
         partial_name = partials_dict[key_tuple]['name']
 
+        # OLD FULL JACOBIAN
         inner_str = f'1.0/(np.cos({input})**2).flatten()'
-        if is_sparse_jac:
-            partials_block.write(f'{partial_name} = sp.diags({inner_str}, format = \'csc\')')
-        else:
-            partials_block.write(f'{partial_name} = np.diag({inner_str}.flatten())')
+        # if is_sparse_jac:
+        #     partials_block.write(f'{partial_name} = sp.diags({inner_str}, format = \'csc\')')
+        # else:
+        #     partials_block.write(f'{partial_name} = np.diag({inner_str}.flatten())')
+
+        # NEW: 
+        # only return diag values for elementwise
+        # Also sparsity doesn't matter
+        partials_block.write(f'{partial_name} = {inner_str}')
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)

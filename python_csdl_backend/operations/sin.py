@@ -35,10 +35,16 @@ class SinLite(OperationBase):
         output = key_tuple[0].id
         partial_name = partials_dict[key_tuple]['name']
 
-        if is_sparse_jac:
-            partials_block.write(f'{partial_name} = sp.diags(np.cos({input}).flatten(), format = \'csc\')')
-        else:
-            partials_block.write(f'{partial_name} = np.diag(np.cos({input}).flatten())')
+        # OLD FULL JACOBIAN
+        # if is_sparse_jac:
+        #     partials_block.write(f'{partial_name} = sp.diags(np.cos({input}).flatten(), format = \'csc\')')
+        # else:
+        #     partials_block.write(f'{partial_name} = np.diag(np.cos({input}).flatten())')
+
+        # NEW: 
+        # only return diag values for elementwise
+        # Also sparsity doesn't matter
+        partials_block.write(f'{partial_name} = np.cos({input}).flatten()')
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)

@@ -37,10 +37,16 @@ class Log10Lite(OperationBase):
         output = key_tuple[0].id
         partial_name = partials_dict[key_tuple]['name']
 
-        if is_sparse_jac:
-            partials_block.write(f'{partial_name} = sp.diags(1.0/(np.log(10)*{input}).flatten(), format = \'csc\')')
-        else:
-            partials_block.write(f'{partial_name} = np.diag(1.0/(np.log(10)*{input}).flatten())')
+        # OLD FULL JACOBIAN
+        # if is_sparse_jac:
+        #     partials_block.write(f'{partial_name} = sp.diags(1.0/(np.log(10)*{input}).flatten(), format = \'csc\')')
+        # else:
+        #     partials_block.write(f'{partial_name} = np.diag(1.0/(np.log(10)*{input}).flatten())')
+
+        # NEW:
+        # only return diag values for elementwise
+        # Also sparsity doesn't matter
+        partials_block.write(f'{partial_name} = 1.0/(np.log(10)*{input}).flatten()')
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)

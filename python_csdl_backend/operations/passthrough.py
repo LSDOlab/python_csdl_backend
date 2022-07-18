@@ -34,10 +34,16 @@ class PassthroughLite(OperationBase):
 
         size = self.input_size
 
-        if is_sparse_jac:
-            vars[partial_name] = sp.eye(size, format='csc')
-        else:
-            vars[partial_name] = np.eye(size)
+        # OLD FULL JACOBIAN
+        # if is_sparse_jac:
+        #     vars[partial_name] = sp.eye(size, format='csc')
+        # else:
+        #     vars[partial_name] = np.eye(size)
+
+        # NEW: 
+        # only return diag values for elementwise
+        # Also sparsity doesn't matter
+        vars[partial_name] = np.ones(size)
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)

@@ -37,11 +37,17 @@ class SecLite(OperationBase):
         output = key_tuple[0].id
         partial_name = partials_dict[key_tuple]['name']
 
+        # OLD FULL JACOBIAN
         inner = f'((np.sin({input}) / np.cos({input})) *(1.0 / np.cos({input}))).flatten()'
-        if is_sparse_jac:
-            partials_block.write(f'{partial_name} = sp.diags({inner}, format = \'csc\')')
-        else:
-            partials_block.write(f'{partial_name} = np.diag({inner}.flatten())')
+        # if is_sparse_jac:
+        #     partials_block.write(f'{partial_name} = sp.diags({inner}, format = \'csc\')')
+        # else:
+        #     partials_block.write(f'{partial_name} = np.diag({inner}.flatten())')
+
+        # NEW: 
+        # only return diag values for elementwise
+        # Also sparsity doesn't matter
+        partials_block.write(f'{partial_name} = {inner}')
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)
