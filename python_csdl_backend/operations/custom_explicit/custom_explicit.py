@@ -99,7 +99,7 @@ class CustomExplicitWrapper():
     def __init__(self, op, ordered_in_names, ordered_out_names):
 
         self.op = op
-        self.derivatives = op.derivatives_meta
+        self.derivatives = op.derivatives_meta.copy()
         self.ordered_in_names = ordered_in_names
         self.ordered_out_names = ordered_out_names
         self.needs_partials = True  # is set to true when the last method called is 'compute'
@@ -216,7 +216,11 @@ class CustomExplicitWrapper():
             d_outputs = {}
             for output_name in d_outs:
                 out_shape = self.ordered_out_names[output_name]['shape']
-                d_outputs[output_name] = d_outs[output_name][row_index, :].reshape(out_shape)
+
+                if isinstance(d_outs[output_name], np.ndarray):
+                    d_outputs[output_name] = d_outs[output_name][row_index, :].reshape(out_shape)
+                else:
+                    d_outputs[output_name] = (d_outs[output_name][row_index, :].toarray()).reshape(out_shape)
 
             # initial d_inputs: users ARE writing to d_inputs
             d_inputs = {}

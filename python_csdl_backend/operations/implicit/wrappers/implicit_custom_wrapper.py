@@ -19,7 +19,7 @@ class ImplicitCustomWrapper(ImplicitWrapperBase):
         self.op = op
         self.ordered_inputs = ins
         self.ordered_outs = outs
-        self.derivatives = op.derivatives_meta
+        self.derivatives = op.derivatives_meta.copy()
 
         self.tol = 1e-10
 

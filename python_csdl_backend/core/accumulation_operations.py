@@ -10,6 +10,7 @@ def diag_mult(path_to, diag_vals):
     # print(type(diag_vals), type(path_to))
 
     if isinstance(path_to, numpy_class):
-        return path_to*diag_vals
+        # return path_to*diag_vals
+        return np.multiply(path_to,diag_vals)
     else:
         return path_to.multiply(diag_vals)

@@ -231,7 +231,11 @@ class ImplicitSolverBase():
         for row_ind in range(num_rows):
             for output_name in b:
                 shape = self.states[output_name]['shape']
-                d_out[output_name] = b[output_name][row_ind, :].reshape(shape)
+
+                if isinstance( b[output_name], np.ndarray):
+                    d_out[output_name] = b[output_name][row_ind, :].reshape(shape)
+                else:
+                    d_out[output_name] = (b[output_name][row_ind, :].toarray()).reshape(shape)
 
             solved_rev = self.function_wrapper.apply_inverse_jacT(d_out)
 
