@@ -4,7 +4,7 @@ Repository for new CSDL backend.
 
 # Installation
 
-Install with `pip install -e .` in root directory.
+Install with `pip install -e .` in root directory. run `pytest` in root directory.
 
 Requires most recent `csdl`: https://github.com/LSDOlab/csdl
 
