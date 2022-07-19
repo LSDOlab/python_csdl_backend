@@ -125,7 +125,7 @@ class Simulator(SimulatorBase):
             self.process_optimization_vars()
 
         #  ----------- create model evaluation script -----------
-        self.eval_instructions = Instructions(f'RUN_MODEL{self.rep}')
+        self.eval_instructions = Instructions(f'RUN_MODEL')
 
         # This line basically creates the mode evaluation graph
         eval_block, self.preeval_vars, state_vals_extracted, variable_info = self.system_graph.generate_evaluation()
@@ -157,7 +157,7 @@ class Simulator(SimulatorBase):
         input_names = to_list(inputs)
 
         # name of instructions
-        adj_name = 'GC:'
+        adj_name = 'DERIVATIVES'
         for output_name in output_names:
             adj_name += f'{output_name},'
         adj_name += '-->'
@@ -167,8 +167,6 @@ class Simulator(SimulatorBase):
         # initialize adjoint derivatives instructions to write to
         # This script will be ran every
         adj_instructions = Instructions(adj_name)
-        # adj_instructions.script.write('import scipy.sparse as sp')
-        # adj_instructions.script.write('import numpy as np')
 
         # generate reverse is only a function of unique ID's therefore, find the appropriate id's for each input and output
         output_ids = []
@@ -525,10 +523,10 @@ class Simulator(SimulatorBase):
                     error_dict[(output_name, input_name)]['relative_error_norm'] = np.linalg.norm(error_jac)/np.linalg.norm(fd_jac)
 
         # print
-        max_key_len = 0
-        max_rel_len = 0
+        max_key_len = len('(of,wrt)')
+        max_rel_len = len('relative error')
         max_calc_len = len('calc norm')
-        max_abs_len = 0
+        max_abs_len = len('abs_error_norm')
         for key in error_dict:
             key_str = str(key)
             if len(key_str) > max_key_len:
@@ -596,6 +594,8 @@ class Simulator(SimulatorBase):
 
     def _compute_fd_partial(self, input_name, input_dict, outputs_dict, delta=1e-6):
 
+
+
         input_size = input_dict['size']
         input_shape = input_dict['shape']
 
@@ -617,9 +617,7 @@ class Simulator(SimulatorBase):
             temp_state[input_id] = temp_state[input_id].reshape(input_shape)
 
             # compute f(x+h)
-            # print(temp_state[input_name])
             new_states = self._run(temp_state)
-            # print(new_states[input_name])
 
             # build finite difference jacobian
             for output_name in outputs_dict:

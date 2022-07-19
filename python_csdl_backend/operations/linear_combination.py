@@ -57,7 +57,7 @@ class LinearCombinationLite(OperationBase):
             # else:
             #     vars[partial_name] = np.eye(size)*coeff
 
-            # NEW: 
+            # NEW:
             # only return diag values for elementwise
             # Also sparsity doesn't matter
             vars[partial_name] = np.ones(size)*coeff
