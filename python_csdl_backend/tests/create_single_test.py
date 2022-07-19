@@ -1,4 +1,4 @@
-from csdl_om import Simulator as OmSimulator
+# from csdl_om import Simulator as OmSimulator
 from python_csdl_backend import Simulator as LiteSimulator
 import pytest
 import numpy as np
@@ -16,7 +16,10 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
 
     model_lite = model
 
-    sim_lite = LiteSimulator(model_lite, sparsity=sparsity_case, analytics=0)
+    sim_lite = LiteSimulator(model_lite,
+                             sparsity=sparsity_case,
+                             analytics=0,
+                             display_scripts=False)
     # sim_lite.eval_instructions.save()
     sim_lite.run()
     error_dict = sim_lite.check_partials(compact_print=True)
