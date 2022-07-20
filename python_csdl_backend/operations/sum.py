@@ -15,7 +15,7 @@ def get_sum_lite(op):
         if len(op.dependencies) == 1:
             return SingleTensorSumCompLite
         else:
-            raise NotImplementedError('zero axis multi not implemented')
+            return MultipleTensorSumCompLite
     else:
         if len(op.dependencies) == 1:
             return SingleTensorSumCompAxisLite
@@ -45,14 +45,49 @@ class SingleTensorSumCompLite(OperationBase):
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
 
         key_tuple = get_only(partials_dict)
-        input = key_tuple[1]
-        output = key_tuple[0]
         partial_name = partials_dict[key_tuple]['name']
 
         if not is_sparse_jac:
             vars[partial_name] = np.ones((1, self.input_size))
         else:
             vars[partial_name] = np.ones((1, self.input_size))
+
+
+class MultipleTensorSumCompLite(OperationBase):
+
+    def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):
+        op_name = 'multiple_tensor_sum_no_axis'
+        name = f'{name} {op_name}'
+        super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.elementwise = True
+
+        self.in_names = [self.get_input_id(var.name) for var in operation.dependencies]
+        self.shape = operation.dependencies[0].shape
+        self.out_name = self.get_output_id(operation.outs[0].name)
+        self.out_shape = operation.outs[0].shape
+        self.axes = operation.literals['axes']
+        self.vals = [var.val for var in operation.dependencies]
+
+        self.input_size = np.prod(self.shape)
+
+    def get_evaluation(self, eval_block, vars):
+
+        eval_block.write(f'{self.out_name} = {self.in_names[0]}')
+        for i, in_name in enumerate(self.in_names):
+            if i == 0:
+                continue
+            eval_block.write(f'+ {in_name}', linebreak=False)
+
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+
+        for key_tuple in partials_dict:
+            partial_name = partials_dict[key_tuple]['name']
+
+            # if elementwise, return only the diagonal values
+            if not is_sparse_jac:
+                vars[partial_name] = np.ones((self.input_size,))
+            else:
+                vars[partial_name] = np.ones((self.input_size,))
 
 
 class SingleTensorSumCompAxisLite(OperationBase):
