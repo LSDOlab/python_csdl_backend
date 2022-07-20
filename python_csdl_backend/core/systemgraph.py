@@ -19,6 +19,7 @@ from csdl.rep.operation_node import OperationNode
 from csdl.utils.prepend_namespace import prepend_namespace
 from csdl.lang.input import Input
 from csdl.lang.output import Output
+from csdl.lang.variable import Variable
 
 
 class SystemGraph(object):
@@ -584,6 +585,13 @@ class SystemGraph(object):
                         jac_function_input_id = backend_op.get_input_id(jac_function_input)
                         path_in_name = f'{middle_operation.name}_{out_id}_{jac_function_input_id}'
                         path_in_names.append(path_in_name)
+                    # need for edge case with bracketed search with csdl variables.
+                    if isinstance(backend_op.operation, BracketedSearchOperation):
+                        for jac_function_input in backend_op.ordered_in_brackets:
+                            jac_function_input_id = backend_op.get_input_id(jac_function_input)
+                            path_in_name = f'{middle_operation.name}_{out_id}_{jac_function_input_id}'
+                            brack_var = self.unique_to_node[jac_function_input_id]
+                            rev_block.write(f'{path_in_name} = np.zeros(({output_size}, {np.prod(brack_var.var.shape)}))')
 
                     # path_out_names are paths from output to the outputs of the jac_function operation
                     # THESE PATHS SHOULD BE FULLY COMPUTED BY NOW (unless the jac_function output is independent of output or is the output)
@@ -757,6 +765,21 @@ class SystemGraph(object):
                 True)
 
         return rev_block, prerev_vars
+
+    def replace_brackets_lang_var_to_rep_var(self, bracket_node):
+        # iterate through brackets map to see if there are any matching variables.
+        vars_to_find = []
+
+        # if node
+        bracket_op = bracket_node.op
+        for state_name in bracket_op.brackets:
+            l, u = bracket_op.brackets[state_name]
+
+            if isinstance(l, Variable):
+                print(l)
+
+            if isinstance(u, Variable):
+                print(u)
 
 
 def print_loading(

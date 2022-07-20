@@ -16,6 +16,7 @@ class ImplicitSolverBase():
         # list of ordered input names and outputs of the implicit function defined by user.
         self.ordered_inputs = ins
         self.ordered_outs = outs
+        self.ordered_in_brackets = {}
 
         # build function wrapper attribute.
         # function_wrapper does:
@@ -49,6 +50,15 @@ class ImplicitSolverBase():
         # Set inputs to the implicit operation:
         for i, input_name in enumerate(self.ordered_inputs):
             self.function_wrapper.set_input(input_name, inputs[i])
+
+        # rare case for implicit operation brackets:
+        for j, bracket_name in enumerate(self.ordered_in_brackets):
+            state_bracket_name = self.ordered_in_brackets[bracket_name]['state']
+            lower_upper_ind = self.ordered_in_brackets[bracket_name]['lower_upper_ind']
+            if lower_upper_ind == 0:
+                self.brackets_map[state_bracket_name] = (inputs[i+j+1], self.brackets_map[state_bracket_name][1])
+            else:
+                self.brackets_map[state_bracket_name] = (self.brackets_map[state_bracket_name][0], inputs[i+j+1])
 
         # Set initial guess:
         for state_name in self.states:
@@ -232,7 +242,7 @@ class ImplicitSolverBase():
             for output_name in b:
                 shape = self.states[output_name]['shape']
 
-                if isinstance( b[output_name], np.ndarray):
+                if isinstance(b[output_name], np.ndarray):
                     d_out[output_name] = b[output_name][row_ind, :].reshape(shape)
                 else:
                     d_out[output_name] = (b[output_name][row_ind, :].toarray()).reshape(shape)

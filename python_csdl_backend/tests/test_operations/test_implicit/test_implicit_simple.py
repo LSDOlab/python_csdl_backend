@@ -74,7 +74,7 @@ def test_implicit_simple_newton():
         name = 'test_implicit_simple_newton',
         vals_dict=vals_dict,
         totals_dict=totals_dict,
-        )
+    )
 
 
 def test_implicit_simple_bracket():

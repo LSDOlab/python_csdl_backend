@@ -517,7 +517,7 @@ class Simulator(SimulatorBase):
                 error_dict[(output_name, input_name)]['analytical_norm'] = np.linalg.norm(analytical_jac)
                 error_dict[(output_name, input_name)]['fd_jac'] = fd_jac
 
-                if (np.linalg.norm(fd_jac) < 1e-10) and (np.linalg.norm(analytical_jac) < 1e-10):
+                if (np.linalg.norm(fd_jac) < 5e-9) and (np.linalg.norm(analytical_jac) < 1e-10):
                     error_dict[(output_name, input_name)]['relative_error_norm'] = 0.0  # This is pretty messy
                 else:
                     error_dict[(output_name, input_name)]['relative_error_norm'] = np.linalg.norm(error_jac)/np.linalg.norm(fd_jac)

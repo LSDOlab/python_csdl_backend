@@ -5,6 +5,7 @@ from csdl.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from csdl.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
 from csdl.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from csdl.solvers.nonlinear.newton import NewtonSolver
+from csdl.lang.variable import Variable
 
 # from python_csdl_backend.operations.implicit.nonlinear_block_gs import NLBGSLite
 # from python_csdl_backend.operations.implicit.nonlinear_block_jac import NLBJLite
@@ -60,12 +61,28 @@ class ImplicitLite(OperationBase):
 
         temp = [d.name for d in self.operation.dependencies]
 
+        self.ordered_in_brackets = {}
+        if isinstance(operation, BracketedSearchOperation):
+            for state, (l, u) in operation.brackets.items():
+                if isinstance(l, Variable):
+                    self.ordered_in_brackets[l.name] = {}
+                    self.ordered_in_brackets[l.name]['id'] = self.get_input_id(l.name)
+                    self.ordered_in_brackets[l.name]['state'] = state
+                    self.ordered_in_brackets[l.name]['lower_upper_ind'] = 0
+
+                if isinstance(u, Variable):
+                    self.ordered_in_brackets[u.name] = {}
+                    self.ordered_in_brackets[u.name]['id'] = self.get_input_id(u.name)
+                    self.ordered_in_brackets[u.name]['state'] = state
+                    self.ordered_in_brackets[u.name]['lower_upper_ind'] = 1
+
         # this block here is due to a csdl bug
         self.ordered_in_names = []  # inputs
         for name in temp:
-            if name not in self.ordered_in_names:
+            if (name in self.ordered_in_brackets):
+                continue
+            if (name not in self.ordered_in_names):
                 self.ordered_in_names.append(name)
-
         # this block here is due to a csdl bug.
         # why are op.outs and op.dependents empty for custom imp ops?
         self.ordered_out_names = [d.name for d in self.operation.outs]  # outputs
@@ -90,7 +107,9 @@ class ImplicitLite(OperationBase):
         # Input variables in order
         in_argument = ''
         for inv in self.ordered_in_names:
-
+            inv_id = self.get_input_id(inv)
+            in_argument += inv_id+', '
+        for inv in self.ordered_in_brackets:
             inv_id = self.get_input_id(inv)
             in_argument += inv_id+', '
         in_argument = in_argument.rstrip(in_argument[-1])
@@ -125,6 +144,7 @@ class ImplicitLite(OperationBase):
             partials_block.write(f'{path} = {self.operation_name}_path_in[{i}]')
 
 
+
 class NewtonLite(ImplicitLite):
 
     def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):
@@ -147,7 +167,8 @@ class BracketedSearchLite(ImplicitLite):
         self.solver = BracketedSolver(
             operation,
             self.ordered_in_names,
-            self.ordered_out_names
+            self.ordered_out_names,
+            self.ordered_in_brackets,
         )
 
 

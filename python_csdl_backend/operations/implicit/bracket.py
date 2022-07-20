@@ -3,16 +3,20 @@ from scipy import linalg
 import scipy.sparse as sp
 from python_csdl_backend.operations.implicit.implicit_solver import ImplicitSolverBase
 import warnings
+from csdl.lang.variable import Variable
 
 
 class BracketedSolver(ImplicitSolverBase):
 
-    def __init__(self, op, ins, outs):
+    def __init__(self, op, ins, outs, bracket_vars):
+        bracket_vars_jump = bracket_vars.copy()
         super().__init__(op, ins, outs)
 
         self.brackets_map = op.brackets
+        self.ordered_in_brackets = bracket_vars_jump
+
         self.max_iter = op.maxiter
-        self.tol = 1e-12
+        self.tol = 1e-14
 
     def _solve_implicit(self):
 
@@ -38,8 +42,21 @@ class BracketedSolver(ImplicitSolverBase):
             state_name = self.residuals[residual_name]['state']
             shape = self.states[state_name]['shape']
 
-            x_lower[state_name] = self.brackets_map[state_name][0] * np.ones(shape)
-            x_upper[state_name] = self.brackets_map[state_name][1] * np.ones(shape)
+            if isinstance(self.brackets_map[state_name][0], np.ndarray):
+                if np.prod(self.brackets_map[state_name][0].shape) == np.prod(shape):
+                    x_lower[state_name] = self.brackets_map[state_name][0].reshape(shape)
+                else:
+                    x_lower[state_name] = self.brackets_map[state_name][0] * np.ones(shape)
+            else:
+                x_lower[state_name] = self.brackets_map[state_name][0] * np.ones(shape)
+
+            if isinstance(self.brackets_map[state_name][1], np.ndarray):
+                if np.prod(self.brackets_map[state_name][1].shape) == np.prod(shape):
+                    x_upper[state_name] = self.brackets_map[state_name][1].reshape(shape)
+                else:
+                    x_upper[state_name] = self.brackets_map[state_name][1] * np.ones(shape)
+            else:
+                x_upper[state_name] = self.brackets_map[state_name][1] * np.ones(shape)
 
         # Compute residuals at each end of the bracket.
         # Lower:
