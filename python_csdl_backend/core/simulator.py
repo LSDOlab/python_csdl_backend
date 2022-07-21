@@ -4,7 +4,7 @@ from csdl import SimulatorBase, Model, Operation, ImplicitOperation, GraphRepres
 from python_csdl_backend.core.instructions import Instructions
 from python_csdl_backend.core.operation_map import csdl_to_back_map
 from python_csdl_backend.core.systemgraph import SystemGraph
-from python_csdl_backend.utils.general_utils import get_deriv_name, to_list, lineup_string
+from python_csdl_backend.utils.general_utils import get_deriv_name, to_list, lineup_string, set_opt_upper_lower
 import warnings
 
 import matplotlib.pyplot as plt
@@ -594,8 +594,6 @@ class Simulator(SimulatorBase):
 
     def _compute_fd_partial(self, input_name, input_dict, outputs_dict, delta=1e-6):
 
-
-
         input_size = input_dict['size']
         input_shape = input_dict['shape']
 
@@ -636,7 +634,7 @@ class Simulator(SimulatorBase):
         return fd_jacs
 
     def process_optimization_vars(self):
-
+        # to extract information to send to modopt
         self.total_dv_size = 0
         for dv_name, dv_dict in self.dvs.items():
             dv_node = dv_dict['node']
@@ -649,10 +647,9 @@ class Simulator(SimulatorBase):
             self.total_dv_size += dv_size
             dv_dict['index_upper'] = self.total_dv_size
 
-            if not dv_dict['lower']:
-                dv_dict['lower'] = np.ones(dv_shape)*(-1.0e30)
-            if not dv_dict['upper']:
-                dv_dict['upper'] = np.ones(dv_shape)*(1.0e30)
+            # process lower and upper bounds
+            dv_dict['lower'] = set_opt_upper_lower(dv_dict['lower'], dv_name, dv_shape, 'lower')
+            dv_dict['upper'] = set_opt_upper_lower(dv_dict['upper'], dv_name, dv_shape, 'upper')
 
         self.total_constraint_size = 0
         for c_name, c_dict in self.cvs.items():
@@ -666,10 +663,9 @@ class Simulator(SimulatorBase):
             self.total_constraint_size += c_size
             c_dict['index_upper'] = self.total_constraint_size
 
-            if c_dict['lower'] is None:
-                c_dict['lower'] = np.ones(c_shape)*(-1.0e30)
-            if c_dict['upper'] is None:
-                c_dict['upper'] = np.ones(c_shape)*(1.0e30)
+            # process lower and upper bounds
+            c_dict['lower'] = set_opt_upper_lower(c_dict['lower'], c_name, c_shape, 'lower')
+            c_dict['upper'] = set_opt_upper_lower(c_dict['upper'], c_name, c_shape, 'upper')
 
     def get_design_variable_metadata(self):
         # return error if not optimization problem
