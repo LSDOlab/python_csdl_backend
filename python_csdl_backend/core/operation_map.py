@@ -37,6 +37,7 @@ from csdl.operations.transpose import transpose
 from csdl.operations.rotmat import rotmat
 from csdl.operations.outer import outer
 from csdl.operations.reorder_axes import reorder_axes
+from csdl.operations.exp_a import exp_a
 # from csdl.operations.inner import inner
 # from csdl.operations.average import average
 # from csdl.operations.min import min
@@ -86,6 +87,7 @@ from python_csdl_backend.operations.transpose import get_transpose_lite
 from python_csdl_backend.operations.rotmat import get_rotmat_lite
 from python_csdl_backend.operations.outer import get_outer_lite
 from python_csdl_backend.operations.reorder_axes import get_reorder_axes_lite
+from python_csdl_backend.operations.exp_a import get_exp_a_lite
 # from python_csdl_backend.operations.inner import get_inner_lite
 # from python_csdl_backend.operations.average import get_average_lite
 # from python_csdl_backend.operations.min import get_min_lite
@@ -100,6 +102,7 @@ csdl_to_back_map = {
     linear_combination: get_linear_combination_lite,
     power_combination:  get_power_combination_lite,
     exp:  get_exp_lite,
+    exp_a: get_exp_a_lite,
     sin:  get_sin_lite,
     cos:  get_cos_lite,
     pnorm: get_pnorm_lite,
