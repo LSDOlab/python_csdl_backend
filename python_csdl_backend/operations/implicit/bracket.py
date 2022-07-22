@@ -2,6 +2,7 @@ import numpy as np
 from scipy import linalg
 import scipy.sparse as sp
 from python_csdl_backend.operations.implicit.implicit_solver import ImplicitSolverBase
+from python_csdl_backend.utils.operation_utils import nl_solver_completion_status
 import warnings
 from csdl.lang.variable import Variable
 
@@ -16,7 +17,7 @@ class BracketedSolver(ImplicitSolverBase):
         self.ordered_in_brackets = bracket_vars_jump
 
         self.max_iter = op.maxiter
-        self.tol = 1e-14
+        self.tol = 1e-12
 
     def _solve_implicit(self):
 
@@ -137,7 +138,11 @@ class BracketedSolver(ImplicitSolverBase):
 
         # solver terminates:
         if not converged:
-            warnings.warn(f'Bracketed search did not converge in {self.max_iter} iterations.')
+            warnings.warn(f'nonlinear solver: bracketed search did not converge in {self.max_iter} iterations.')
+
+        # print status of nlsolver
+        print(nl_solver_completion_status('bracketed search', iter_num, self.tol, converged))
+
         # for residual_name, res_dict in self.residuals.items():
         #     state_name = res_dict['state']
         #     x[state_name] = 0.5 * xp[state_name] + 0.5 * xn[state_name]

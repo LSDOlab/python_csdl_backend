@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import linalg
 from python_csdl_backend.operations.implicit.implicit_solver import ImplicitSolverBase
+from python_csdl_backend.utils.operation_utils import nl_solver_completion_status
 import scipy.sparse as sp
 
 
@@ -36,7 +37,7 @@ class NewtonSolverLite(ImplicitSolverBase):
                 residual_val = self.function_wrapper.get_residual(residual_name)
 
                 error = np.linalg.norm(residual_val.flatten())
-                print(f'iteration {iter}, {residual_name} error: {error}')
+                # print(f'iteration {iter}, {residual_name} error: {error}')
 
                 # if any of the residuals do not meet tolerance, no need to compute errors for other residuals
                 if error > self.tol:
@@ -87,6 +88,8 @@ class NewtonSolverLite(ImplicitSolverBase):
             for state in solved_vec:
                 new_state = self.function_wrapper.get_state(state) - solved_vec[state].reshape(self.states[state]['shape'])
                 self.function_wrapper.set_state(state, new_state)
+
+        print(nl_solver_completion_status('newton solver', iter, self.tol, solved))
 
         # Shouldn't be necessary?
         # if self.full_residual_jac:

@@ -42,3 +42,24 @@ def list_to_argument_str(argin_list):
         else:
             return_arg += arg_in + ', '
     return return_arg
+
+def nl_solver_completion_status(
+        nlsolver_type, 
+        iter_num, 
+        tol,
+        did_converge):
+    """
+    returns status string of non-linear solver completion
+
+    Parameters:
+    -----------
+        nlsolver_type: string of type of solver
+        iter_num: iteration number when exit
+        tol: user specified tolerance
+        did_converge: obvious
+    """
+    
+    if did_converge:
+        return f'nonlinear solver: {nlsolver_type} converged in {iter_num} iterations.'
+    else:
+        return f'nonlinear solver: {nlsolver_type} did not converge to tol {tol} in {iter_num} iterations.'
