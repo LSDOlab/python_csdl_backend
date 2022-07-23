@@ -14,7 +14,7 @@ https://github.com/LSDOlab/csdl_om
 - NOTE: this version of `csdl_om` does not work with caddee. To switch to `csdl_om`, follow the following instructions.
 
 To go back to a working version of `csdl_om`:
-- in CSDL root: `git checkout 98d7f6d43a74042a5f8ded2a2b20d431f0c1c342`
+- in CSDL root: `git checkout dev_caddee`
 - in CSDL_OM root:  `git checkout dev_caddee`
 - (`git checkout master` in both to go back to most recent commit)
 
