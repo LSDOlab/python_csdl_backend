@@ -442,7 +442,7 @@ class SystemGraph(object):
             # - Do not search down a node until ALL* edges leading into it has been search as well
             # - Do not search down an implicit output untill ALL* implicit outputs have been searched
             # - * All edges dependent on the output
-            fully_visited = []  # list containing nodes that were fully visited
+            fully_visited = set()  # set containing nodes that were fully visited
             queue = [output_node]  # list to perform BFS on in order
 
             # Check if output is a leaf node.
@@ -455,7 +455,7 @@ class SystemGraph(object):
                 # Node 'current' HAS to be a variable
                 # queue should never contain variables that have already appeared queue before
                 current = queue.pop(0)
-                fully_visited.append(current)
+                fully_visited.add(current)
 
                 # Get the operation which outputs variable 'current'
                 # variable 'successor's --> operation 'middle_operation' --> variable 'current'
