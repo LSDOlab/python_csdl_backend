@@ -89,52 +89,12 @@ class OperationBase():
         """
 
         for pred in self.nx_inputs_dict.values():
-
+            found_match = False
             # if not part of a connection, find the variable associated with the dependencies by the local name
-            if not pred.connected_to:
+            # first check if variable is a connection and find the tgt node.
+            if len(pred.connected_to) > 0:
 
-                found_match = False
-
-                # Loop through predecessors and check if local names match
-                for csdl_pred in self.operation.dependencies:
-
-                    # check names
-                    if '.' in csdl_pred.name:
-                        csdl_pred_name = csdl_pred.name.split('.')[-1]
-                    else:
-                        csdl_pred_name = csdl_pred.name
-                    if csdl_pred_name == pred.name:
-
-                        # If we already found a match, raise an error
-                        if found_match:
-
-                            if csdl_pred in self.input_csdl_to_rep:
-                                continue
-
-                            # This is a dev error. If this has been thrown, user has not necessarily made an error.
-                            # If we already found a match, that means two inputs have the same local name (?).
-                            # I guess this is actually happen
-                            raise KeyError(f'already found a match')
-
-                        # set found_match = True and set mapping
-                        found_match = True
-                        self.input_csdl_to_rep[csdl_pred] = pred
-                        self.input_rep_to_csdl[pred] = csdl_pred
-                        self.input_name_to_unique[csdl_pred.name] = pred.id
-
-                # If we haven't found a match after looping through all predecessors, throw error
-                if not found_match:
-                    print('ERROR')
-                    print(pred.name)
-                    for csdl_pred in self.operation.dependencies:
-                        print(csdl_pred.name)
-
-                    # This is a dev error. If this has been thrown, user has not necessarily made an error.
-                    raise KeyError(f'Did not find match')
-
-            else:
                 # if node is a connection source, compare the language variable objects
-                found_match = False
 
                 # check if the input is a source node itself
                 for csdl_pred in self.operation.dependencies:
@@ -146,7 +106,6 @@ class OperationBase():
 
                 # otherwise, check if the connection targets are a source
                 for tgt in pred.connected_to:
-                    # print(pred.var, tgt.name, tgt.var)
                     for csdl_pred in self.operation.dependencies:
                         # print('\t', csdl_pred, csdl_pred.name)
                         if tgt.var.name == csdl_pred.name:
@@ -160,15 +119,58 @@ class OperationBase():
                             self.input_rep_to_csdl[pred] = csdl_pred
                             self.input_name_to_unique[csdl_pred.name] = pred.id
 
-                if not found_match:
-                    # print('ERROR')
-                    # print(self.operation)
-                    # print(pred.namespace, pred.name)
-                    # for csdl_pred in self.operation.dependencies:
-                    #     print(csdl_pred.name, csdl_pred)
+            # if not a connection or connection target not found, try to match declared variables.
+            if found_match == True:
+                continue
 
-                    # This is a dev error. If this has been thrown, user has not necessarily made an error.
-                    raise KeyError(f'Did not find match')
+            # Loop through predecessors and check if local names match
+            for csdl_pred in self.operation.dependencies:
+
+                # check names
+                if '.' in csdl_pred.name:
+                    csdl_pred_name = csdl_pred.name.split('.')[-1]
+                else:
+                    csdl_pred_name = csdl_pred.name
+                if csdl_pred_name == pred.name:
+
+                    # If we already found a match, raise an error
+                    if found_match:
+
+                        if csdl_pred in self.input_csdl_to_rep:
+                            continue
+
+                        # This is a dev error. If this has been thrown, user has not necessarily made an error.
+                        # If we already found a match, that means two inputs have the same local name (?).
+                        # I guess this is actually happen
+                        raise KeyError(f'already found a match')
+
+                    # set found_match = True and set mapping
+                    found_match = True
+                    self.input_csdl_to_rep[csdl_pred] = pred
+                    self.input_rep_to_csdl[pred] = csdl_pred
+                    self.input_name_to_unique[csdl_pred.name] = pred.id
+
+            # If we haven't found a match after looping through all predecessors, throw error
+            if not found_match:
+                print('\n\n::::::ERROR::::::')
+                print('current operation:', self.operation.name, self.operation)
+                print('predecessor (connection source) without match:', pred.namespace, pred.name)
+                print('all REP predecessors:')
+                for other_pred in self.nx_inputs_dict.values():
+                    print('\t', other_pred.namespace, other_pred.name, other_pred.var)
+                print('all LANG predecessors:')
+                for csdl_pred in self.operation.dependencies:
+                    print('\t', csdl_pred.name, csdl_pred)
+
+                print()
+                for tgt in pred.connected_to:
+                    print(tgt, tgt.var, tgt.var.name)
+                    for tgtgt in tgt.connected_to:
+                        print(tgtgt, tgtgt.var, tgtgt.var.name)
+                print('::::::ERROR::::::\n\n')
+
+                # This is a dev error. If this has been thrown, user has not necessarily made an error.
+                raise KeyError(f'Did not find match')
 
         # Uncomment to print
         # for csdl_pred, rep_pred in input_csdl_to_rep.items():

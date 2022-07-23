@@ -121,6 +121,26 @@ class SystemGraph(object):
                     for unpromoted_id in unpromoted_id_set:
                         self.unpromoted_to_unique[unpromoted_id] = unique_id
 
+                # add all declared target names in mappings
+                # if node.name == 'geometry_control_points':
+                #     for tgt_node in node.declared_to:
+                #         print(tgt_node.name)
+                for tgt_node in (node.declared_to | node.connected_to):
+                    # get declared var promoted name if possible
+                    tgt_promoted_id = prepend_namespace(
+                        tgt_node.namespace,
+                        tgt_node.name,
+                    )
+
+                    if tgt_promoted_id in self.rep.promoted_to_unpromoted:
+                        # Set mapping for tgt promoted to unique
+                        self.promoted_to_unique[tgt_promoted_id] = unique_id
+                        # Set mapping for tgt unpromoted to unique
+                        tgt_unpromoted_id_set = self.promoted_to_unpromoted[tgt_promoted_id]
+
+                        for unpromoted_id in tgt_unpromoted_id_set:
+                            self.unpromoted_to_unique[unpromoted_id] = unique_id
+
                 # check dvs, constraints, objectives
                 if self.opt_bool:
                     if promoted_id in self.dvs:
@@ -172,8 +192,10 @@ class SystemGraph(object):
 
             # write to filename a summary of each node
             with open(filename, 'a') as f:
-                f.write(f'\n{node.name}, {node}\n')
-
+                if isinstance(node, OperationNode):
+                    f.write(f'\n{node.name}, {node.op}\n')
+                else:
+                    f.write(f'\n{node.name}, {node.var}, {node.unpromoted_namespace}\n')
                 # Write predecessors
                 f.write(f'\tPREDECESSORS\n')
                 for dep in self.eval_graph.predecessors(node):
