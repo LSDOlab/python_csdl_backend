@@ -50,6 +50,8 @@ class Implicit(csdl.Model):
             solve_quadratic.declare_state('u', residual='v', val=0.4)
             if solver_type == 'newton':
                 solve_quadratic.nonlinear_solver = csdl.NewtonSolver(solve_subsystems=False)
+            elif solver_type == 'nlbgs':
+                solve_quadratic.nonlinear_solver = csdl.NonlinearBlockGS(maxiter = 100)
             else:
                 raise ValueError(f'solver type {solver_type} is unknown.')
 
@@ -64,31 +66,42 @@ class Implicit(csdl.Model):
         self.register_output('f', x*3.0 + u*3.0 + 0.5*a)
 
 
-def test_implicit_simple_newton():
-    vals_dict = {}
-    totals_dict = {}
-    run_test(
-        Implicit(nlsolver='newton'), 
-        outs = ['x', 'u', 'f'], 
-        ins = ['a', 'b', 'c'],
-        name = 'test_implicit_simple_newton',
-        vals_dict=vals_dict,
-        totals_dict=totals_dict,
-    )
+# def test_implicit_simple_newton():
+#     vals_dict = {'u': [0.66666667]}
+#     totals_dict = {}
+#     run_test(
+#         Implicit(nlsolver='newton'), 
+#         outs = ['x', 'u', 'f'], 
+#         ins = ['a', 'b', 'c'],
+#         name = 'test_implicit_simple_newton',
+#         vals_dict=vals_dict,
+#         totals_dict=totals_dict,
+#     )
 
 
-def test_implicit_simple_bracket():
-    vals_dict = {}
+# def test_implicit_simple_bracket():
+#     vals_dict = {'u': [0.66666667]}
+#     totals_dict = {}
+#     run_test(
+#         Implicit(nlsolver='bracket'), 
+#         outs = ['x', 'u', 'f'], 
+#         ins = ['a', 'b', 'c'],
+#         name = 'test_implicit_simple_bracket',
+#         vals_dict=vals_dict,
+#         totals_dict=totals_dict,
+#         )
+
+def test_implicit_simple_nlbgs():
+    vals_dict = {'u': [0.66666667]}
     totals_dict = {}
     run_test(
-        Implicit(nlsolver='bracket'), 
+        Implicit(nlsolver='nlbgs'), 
         outs = ['x', 'u', 'f'], 
         ins = ['a', 'b', 'c'],
-        name = 'test_implicit_simple_bracket',
+        name = 'test_implicit_simple_bracket_nlbgs',
         vals_dict=vals_dict,
         totals_dict=totals_dict,
         )
-
 
 if __name__ == '__main__':
     run_test(Implicit(nlsolver='newton'), ['x', 'u', 'f'], ['a', 'b', 'c'])

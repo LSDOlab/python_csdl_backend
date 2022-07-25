@@ -282,7 +282,7 @@ class Simulator(SimulatorBase):
                 if var_local_name in totals_dict:
                     if return_format == '[(of, wrt)]':
                         return_dict[(of_name, wrt_name)] = current_derivative
-                    elif return_format == '[of][wrt]':
+                    elif return_format == '[of][wrt]' or return_format == 'dict':
                         if of_name not in return_dict:
                             return_dict[of_name] = {}
                         return_dict[of_name][wrt_name] = current_derivative
@@ -395,11 +395,12 @@ class Simulator(SimulatorBase):
         see is variable name exists. If so, return unique id
         else, return none
         """
-
         if key in self.system_graph.promoted_to_unique:
             return self.system_graph.promoted_to_unique[key]
         elif key in self.system_graph.unpromoted_to_unique:
             return self.system_graph.unpromoted_to_unique[key]
+        elif key in self.system_graph.unique_to_node:
+            return key
         else:
             return None
 

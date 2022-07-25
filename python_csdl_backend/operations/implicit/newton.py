@@ -5,11 +5,13 @@ from python_csdl_backend.utils.operation_utils import nl_solver_completion_statu
 import scipy.sparse as sp
 
 
-class NewtonSolverLite(ImplicitSolverBase):
+class NewtonLiteSolver(ImplicitSolverBase):
 
     def __init__(self, op, ins, outs):
         super().__init__(op, ins, outs)
-        self.tol = 1e-10
+        # print(op)
+        self.maxiter = op.nonlinear_solver.options['maxiter']
+        self.tol = op.nonlinear_solver.options['atol']
 
     def _solve_implicit(self):
 
@@ -48,6 +50,8 @@ class NewtonSolverLite(ImplicitSolverBase):
             if solved:
                 break
             iter += 1
+            if iter >= self.maxiter:
+                break
 
             # resume Newton iteration:
             # compute jacobian

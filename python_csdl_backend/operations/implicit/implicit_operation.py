@@ -7,10 +7,9 @@ from csdl.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from csdl.solvers.nonlinear.newton import NewtonSolver
 from csdl.lang.variable import Variable
 
-# from python_csdl_backend.operations.implicit.nonlinear_block_gs import NLBGSLite
-# from python_csdl_backend.operations.implicit.nonlinear_block_jac import NLBJLite
-# from python_csdl_backend.operations.implicit.nonlinear_runonce import NLROLite
-from python_csdl_backend.operations.implicit.newton import NewtonSolverLite
+
+from python_csdl_backend.operations.implicit.newton import NewtonLiteSolver
+from python_csdl_backend.operations.implicit.nlbgs import NLBGSSolver
 from python_csdl_backend.operations.implicit.bracket import BracketedSolver
 from python_csdl_backend.operations.implicit.solve_residual import SolveResCustom
 from csdl import CustomImplicitOperation
@@ -30,6 +29,8 @@ def get_implicit_lite(csdl_node):
     nlsolver = csdl_node.nonlinear_solver
     if isinstance(nlsolver, NewtonSolver):
         return NewtonLite
+    elif isinstance(nlsolver, NonlinearBlockGS):
+        return NonlinearBlockGSLite
     else:
         raise NotImplementedError(f'nonlinear solver {nlsolver} is not yet implemented in this backend')
 
@@ -42,6 +43,9 @@ def get_implicit_custom_lite(csdl_node):
 
     nlsolver = csdl_node.nonlinear_solver
     if csdl_node.nonlinear_solver is None:
+        csdl_node.nonlinear_solver = NewtonSolver()
+        return NewtonLite
+    elif isinstance(nlsolver, NewtonSolver):
         return NewtonLite
     else:
         raise NotImplementedError(f'nonlinear solver {nlsolver} is not yet implemented in this backend')
@@ -60,7 +64,7 @@ class ImplicitLite(OperationBase):
         # set up user input names in order and user output names in order
 
         temp = [d.name for d in self.operation.dependencies]
-
+        print(temp)
         self.ordered_in_brackets = {}
         if isinstance(operation, BracketedSearchOperation):
             for state, (l, u) in operation.brackets.items():
@@ -112,8 +116,9 @@ class ImplicitLite(OperationBase):
         for inv in self.ordered_in_brackets:
             inv_id = self.get_input_id(inv)
             in_argument += inv_id+', '
-        in_argument = in_argument.rstrip(in_argument[-1])
-        in_argument = in_argument.rstrip(in_argument[-1])
+        if in_argument != '':
+            in_argument = in_argument.rstrip(in_argument[-1])
+            in_argument = in_argument.rstrip(in_argument[-1])
 
         # solved_outputs = newton_op(inputs)
         eval_block.write(f'{self.operation_name}_out = {self.operation_name}.solve({in_argument})')
@@ -144,14 +149,13 @@ class ImplicitLite(OperationBase):
             partials_block.write(f'{path} = {self.operation_name}_path_in[{i}]')
 
 
-
 class NewtonLite(ImplicitLite):
 
     def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):
         name = f'{name}_newton'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
 
-        self.solver = NewtonSolverLite(
+        self.solver = NewtonLiteSolver(
             operation,
             self.ordered_in_names,
             self.ordered_out_names
@@ -171,6 +175,30 @@ class BracketedSearchLite(ImplicitLite):
             self.ordered_in_brackets,
         )
 
+
+class NonlinearBlockGSLite(ImplicitLite):
+
+    def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):
+        name = f'{name}_nlbgs'
+        super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+
+        self.solver = NLBGSSolver(
+            operation,
+            self.ordered_in_names,
+            self.ordered_out_names,
+        )
+
+# class NonlinearBlockJacobiLite(ImplicitLite):
+
+#     def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):
+#         name = f'{name}_nlbgs'
+#         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+
+#         self.solver = NLBJacobiSolver(
+#             operation,
+#             self.ordered_in_names,
+#             self.ordered_out_names,
+#         )
 
 class SolveResLite(ImplicitLite):
 

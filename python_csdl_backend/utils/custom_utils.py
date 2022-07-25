@@ -79,6 +79,17 @@ def process_custom_derivatives_metadata(derivative_dict, out_dict, in_dict):
             elif given_val is not None:
                 derivative_dict[derivative_tuple]['backend_type'] = 'row_col_val_given'
                 derivative_dict[derivative_tuple]['given_val'] = sp.csc_matrix((given_val, (given_rows, given_cols)), shape=(size_out, size_in))
+        elif given_val is not None:
+            derivative_dict[derivative_tuple]['backend_type'] = 'row_col_val_given'
+
+            if isinstance(given_val, np.ndarray):
+                derivative_dict[derivative_tuple]['given_val'] = given_val.reshape((size_out, size_in))
+            elif sp.issparse:
+                if given_val.shape != (size_out, size_in):
+                    raise ValueError(f'sparse partials {derivative_tuple} is of incorrect shape. {given_val.shape} != {(size_out, size_in)}')
+                derivative_dict[derivative_tuple]['given_val'] = given_val
+            else:
+                derivative_dict[derivative_tuple]['given_val'] = given_val*np.ones((size_out, size_in))
         else:
             derivative_dict[derivative_tuple]['backend_type'] = 'standard'
 

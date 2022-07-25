@@ -22,8 +22,10 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
                              display_scripts=False)
     # sim_lite.eval_instructions.save()
     sim_lite.run()
+    # print(sim_lite['u'])
+    # exit()
     error_dict = sim_lite.check_partials(compact_print=True)
-
+    
     # check values if given
     for key in vals_dict:
         np.testing.assert_almost_equal(
