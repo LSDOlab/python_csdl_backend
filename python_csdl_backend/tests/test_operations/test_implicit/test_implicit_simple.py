@@ -1,6 +1,6 @@
 from python_csdl_backend.tests.create_single_test import run_test
 import csdl
-
+import numpy as np
 
 class Implicit(csdl.Model):
     def initialize(self):
@@ -28,7 +28,7 @@ class Implicit(csdl.Model):
         au2 = a*u**2
 
         y = x - (-ax2 - c)/b
-        v = u - (-au2 - c*2)/b
+        v = u - (-au2 - c/2)/b
 
         quadratic.register_output('y', y)
         quadratic.register_output('v', v)
@@ -66,39 +66,51 @@ class Implicit(csdl.Model):
         self.register_output('f', x*3.0 + u*3.0 + 0.5*a)
 
 
-# def test_implicit_simple_newton():
-#     vals_dict = {'u': [0.66666667]}
-#     totals_dict = {}
-#     run_test(
-#         Implicit(nlsolver='newton'), 
-#         outs = ['x', 'u', 'f'], 
-#         ins = ['a', 'b', 'c'],
-#         name = 'test_implicit_simple_newton',
-#         vals_dict=vals_dict,
-#         totals_dict=totals_dict,
-#     )
+def test_implicit_simple_newton():
+    vals_dict = {
+        'x': np.array([0.38742589]),
+        'u': np.array([0.21525044]),
+        'f': np.array([2.55802897]),
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(nlsolver='newton'), 
+        outs = ['x', 'u', 'f'], 
+        ins = ['a', 'b', 'c'],
+        name = 'test_implicit_simple_newton',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+    )
 
 
-# def test_implicit_simple_bracket():
-#     vals_dict = {'u': [0.66666667]}
-#     totals_dict = {}
-#     run_test(
-#         Implicit(nlsolver='bracket'), 
-#         outs = ['x', 'u', 'f'], 
-#         ins = ['a', 'b', 'c'],
-#         name = 'test_implicit_simple_bracket',
-#         vals_dict=vals_dict,
-#         totals_dict=totals_dict,
-#         )
+def test_implicit_simple_bracket():
+    vals_dict = {
+        'x': np.array([0.38742589]),
+        'u': np.array([0.21525044]),
+        'f': np.array([2.55802897]),
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(nlsolver='bracket'), 
+        outs = ['x', 'u', 'f'], 
+        ins = ['a', 'b', 'c'],
+        name = 'test_implicit_simple_bracket',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+        )
 
 def test_implicit_simple_nlbgs():
-    vals_dict = {'u': [0.66666667]}
+    vals_dict = {
+        'x': np.array([0.38742589]),
+        'u': np.array([0.21525044]),
+        'f': np.array([2.55802897]),
+    }
     totals_dict = {}
     run_test(
         Implicit(nlsolver='nlbgs'), 
         outs = ['x', 'u', 'f'], 
         ins = ['a', 'b', 'c'],
-        name = 'test_implicit_simple_bracket_nlbgs',
+        name = 'test_implicit_simple_nlbgs',
         vals_dict=vals_dict,
         totals_dict=totals_dict,
         )

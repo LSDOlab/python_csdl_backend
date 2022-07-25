@@ -34,7 +34,6 @@ class NLBGSSolver(ImplicitSolverBase):
         iter = 0
 
         while True:
-
             # loop through all residuals
             for state_name in self.states:
                 residual_name = self.states[state_name]['residual']
@@ -60,7 +59,7 @@ class NLBGSSolver(ImplicitSolverBase):
                 residual_val = self.function_wrapper.get_residual(residual_name)
 
                 error = np.linalg.norm(residual_val.flatten())
-                print(f'iteration {iter}, {residual_name} error: {error}')
+                # print(f'iteration {iter}, {residual_name} error: {error}')
 
                 # if any of the residuals do not meet tolerance, no need to compute errors for other residuals
                 if error > self.tol:

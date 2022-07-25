@@ -25,6 +25,14 @@ class CustomImp(csdl.CustomImplicitOperation):
 
         self.declare_derivatives('y', 'y', rows=[0], cols=[0], val=[1.0])
 
+        nlsolver = self.parameters['nlsolver']
+        if self.parameters['nlsolver'] == 'nlbgs':
+            self.nonlinear_solver = csdl.NonlinearBlockGS
+        elif self.parameters['nlsolver'] == 'newton':
+            pass
+        else:
+            raise ValueError(f'solver {nlsolver} not found')
+
     def evaluate_residuals(self, inputs, outputs, residuals):
 
         x = outputs['x'][0]

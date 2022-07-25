@@ -90,8 +90,10 @@ def process_custom_derivatives_metadata(derivative_dict, out_dict, in_dict):
                 derivative_dict[derivative_tuple]['given_val'] = given_val
             else:
                 derivative_dict[derivative_tuple]['given_val'] = given_val*np.ones((size_out, size_in))
-        else:
+        elif (given_rows is None) and (given_cols is None) and (given_val is None):
             derivative_dict[derivative_tuple]['backend_type'] = 'standard'
+        else:
+            raise ValueError(f'declare derivative arguments for {derivative_tuple} is incorrect.')
 
     for out_str in out_dict:
         for in_str in in_dict:

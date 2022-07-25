@@ -37,7 +37,7 @@ class Implicit(csdl.Model):
         au2 = a*u**2
 
         y = x - (-ax2 - c)/b
-        v = u - (-au2 - c*2)/b
+        v = u - (-au2 - c/2)/b
 
         quadratic.register_output('y', y)
         quadratic.register_output('v', v)
@@ -58,6 +58,8 @@ class Implicit(csdl.Model):
             solve_quadratic.declare_state('u', residual='v', val=np.ones(shp)*0.3)
             if solver_type == 'newton':
                 solve_quadratic.nonlinear_solver = csdl.NewtonSolver(solve_subsystems=False)
+            elif solver_type == 'nlbgs':
+                solve_quadratic.nonlinear_solver = csdl.NonlinearBlockGS(maxiter = 100)
             else:
                 raise ValueError(f'solver type {solver_type} is unknown.')
             solve_quadratic.linear_solver = csdl.ScipyKrylov()
@@ -76,7 +78,12 @@ class Implicit(csdl.Model):
 
 def test_implicit_simple_large_newton():
     nn = 3
-    vals_dict = {}
+    shp = (nn, nn, nn)
+    vals_dict = {
+        'u': np.ones(shp)*0.23013859,
+        'f': np.array([[[1.66650262]]]),
+        'x': np.ones(shp)*0.43050087,
+    }
     totals_dict = {}
     run_test(
         Implicit(num_nodes1=nn, num_nodes2=nn, num_nodes3=nn, nlsolver='newton'), 
@@ -90,7 +97,12 @@ def test_implicit_simple_large_newton():
 
 def test_implicit_simple_large_bracketed():
     nn = 3
-    vals_dict = {}
+    shp = (nn, nn, nn)
+    vals_dict = {
+        'u': np.ones(shp)*0.23013859,
+        'f': np.array([[[1.66650262]]]),
+        'x': np.ones(shp)*0.43050087,
+    }
     totals_dict = {}
     run_test(
         Implicit(num_nodes1=nn, num_nodes2=nn, num_nodes3=nn, nlsolver='bracket'), 
@@ -101,6 +113,23 @@ def test_implicit_simple_large_bracketed():
         totals_dict=totals_dict,
         )
 
+def test_implicit_simple_large_nlbgs():
+    nn = 3
+    shp = (nn, nn, nn)
+    vals_dict = {
+        'u': np.ones(shp)*0.23013859,
+        'f': np.array([[[1.66650262]]]),
+        'x': np.ones(shp)*0.43050087,
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(num_nodes1=nn, num_nodes2=nn, num_nodes3=nn, nlsolver='nlbgs'), 
+        outs = ['u', 'f',  'x'], 
+        ins = ['d', 'b', 'c'],
+        name = 'test_implicit_simple_large_bracketed',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+        )
 
 if __name__ == '__main__':
     from csdl_om import Simulator as OmSimulator

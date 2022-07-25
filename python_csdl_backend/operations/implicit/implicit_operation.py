@@ -47,6 +47,8 @@ def get_implicit_custom_lite(csdl_node):
         return NewtonLite
     elif isinstance(nlsolver, NewtonSolver):
         return NewtonLite
+    elif isinstance(nlsolver, NonlinearBlockGS):
+        return NonlinearBlockGSLite
     else:
         raise NotImplementedError(f'nonlinear solver {nlsolver} is not yet implemented in this backend')
 
@@ -64,7 +66,7 @@ class ImplicitLite(OperationBase):
         # set up user input names in order and user output names in order
 
         temp = [d.name for d in self.operation.dependencies]
-        print(temp)
+        # print(temp)
         self.ordered_in_brackets = {}
         if isinstance(operation, BracketedSearchOperation):
             for state, (l, u) in operation.brackets.items():

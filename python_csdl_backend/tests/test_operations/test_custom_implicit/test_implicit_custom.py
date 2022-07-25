@@ -25,6 +25,14 @@ class CustomImp(csdl.CustomImplicitOperation):
 
         self.declare_derivatives('y', 'y', rows=[0], cols=[0], val=[1.0])
 
+        nlsolver = self.parameters['nlsolver']
+        if self.parameters['nlsolver'] == 'nlbgs':
+            self.nonlinear_solver = csdl.NonlinearBlockGS(maxiter = 100)
+        elif self.parameters['nlsolver'] == 'newton':
+            pass
+        else:
+            raise ValueError(f'solver {nlsolver} not found')
+
     def evaluate_residuals(self, inputs, outputs, residuals):
 
         x = outputs['x'][0]
@@ -83,7 +91,11 @@ class Implicit(csdl.Model):
 
 
 def test_implicit_custom_newton():
-    vals_dict = {}
+    vals_dict = {
+        'f': np.array([2.38742589]),
+        'x': np.array([0.38742589, 1.]),
+        'y': np.array([2.]),
+        }
     totals_dict = {}
     run_test(
         Implicit(nlsolver='newton'), 
@@ -94,6 +106,21 @@ def test_implicit_custom_newton():
         totals_dict=totals_dict,
         )
 
+def test_implicit_custom_nlbgs():
+    vals_dict = {
+        'f': np.array([2.38742589]),
+        'x': np.array([0.38742589, 1.]),
+        'y': np.array([2.]),
+        }
+    totals_dict = {}
+    run_test(
+        Implicit(nlsolver='nlbgs'), 
+        outs = ['f', 'x', 'y'], 
+        ins = ['a', 'b', 'c'],
+        name='test_implicit_custom_nlbgs',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+        )
 
 if __name__ == '__main__':
 
