@@ -19,6 +19,7 @@ class ReshapeLite(OperationBase):
         op_name = 'reshape'
         name = f'{name} {op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.elementwise = True
 
         self.in_name = get_only(self.nx_inputs_dict)
         self.invar = self.operation.dependencies[0]
@@ -40,10 +41,14 @@ class ReshapeLite(OperationBase):
         key_tuple = get_only(partials_dict)
         partial_name = partials_dict[key_tuple]['name']
 
-        if not is_sparse_jac:
-            vars[partial_name] = np.eye(self.size)
-        else:
-            vars[partial_name] = sp.eye(self.size, format='csc')
+        # OLD:
+        # if not is_sparse_jac:
+        #     vars[partial_name] = np.eye(self.size)
+        # else:
+
+        # NEW:
+        # if elementwise, pass in 1-d diagonal
+        vars[partial_name] = np.ones(self.size)
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.size)
