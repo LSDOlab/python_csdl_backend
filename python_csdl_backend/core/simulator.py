@@ -160,9 +160,11 @@ class Simulator(SimulatorBase):
         adj_name = 'DERIVATIVES'
         for output_name in output_names:
             adj_name += f'{output_name},'
+        adj_name = adj_name.rstrip(adj_name[-1])
         adj_name += '-->'
         for input_name in input_names:
             adj_name += f'{input_name},'
+        adj_name = adj_name.rstrip(adj_name[-1])
 
         # initialize adjoint derivatives instructions to write to
         # This script will be ran every
@@ -177,6 +179,7 @@ class Simulator(SimulatorBase):
             input_ids.append(self._find_unique_id(input_name))
 
         # generate script
+        print(f'\ngenerating: {adj_name}')
         rev_script, pre_vars = self.system_graph.generate_reverse(output_ids, input_ids)
 
         # write the computation steps
