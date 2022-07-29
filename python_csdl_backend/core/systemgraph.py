@@ -195,7 +195,7 @@ class SystemGraph(object):
                 if isinstance(node, OperationNode):
                     f.write(f'\n{node.name}, {node.op}\n')
                 else:
-                    f.write(f'\n{node.name}, {node.var}, {node.unpromoted_namespace}\n')
+                    f.write(f'\n{node.name}, {node.var}, {node.unpromoted_namespace}.{node.name}\n')
                     if node.connected_to:
                         connected_to_bool = True
                     else:
@@ -204,13 +204,18 @@ class SystemGraph(object):
                         declared_to_bool = True
                     else:
                         declared_to_bool = False
+                        
+                    if node.promoted_id in self.rep.promoted_to_node:
+                        if not isinstance(node.var, (Output, Input)):
+                            f.write(f'\tWARNING: this declared variable is not a promotion or connection target.\n')
+
                     f.write(f'\tCONNECTED TO: {connected_to_bool}\n')
                     for connected_to_node in node.connected_to:
                         f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}\n')
                     f.write(f'\tPROMOTED TO: {declared_to_bool}\n')
                     for connected_to_node in node.declared_to:
                         f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}\n')
-                
+
                 # Write predecessors
                 f.write(f'\tPREDECESSORS\n')
                 for dep in self.eval_graph.predecessors(node):
