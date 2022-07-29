@@ -41,7 +41,7 @@ from csdl.operations.exp_a import exp_a
 from csdl.operations.max import max
 # from csdl.operations.inner import inner
 # from csdl.operations.average import average
-# from csdl.operations.min import min
+from csdl.operations.min import min
 
 
 from csdl import CustomExplicitOperation
@@ -91,7 +91,7 @@ from python_csdl_backend.operations.exp_a import get_exp_a_lite
 from python_csdl_backend.operations.max import get_max_lite
 # from python_csdl_backend.operations.inner import get_inner_lite
 # from python_csdl_backend.operations.average import get_average_lite
-# from python_csdl_backend.operations.min import get_min_lite
+from python_csdl_backend.operations.min import get_min_lite
 
 
 from python_csdl_backend.operations.implicit.implicit_operation import get_implicit_lite, get_implicit_custom_lite
@@ -141,9 +141,9 @@ csdl_to_back_map = {
     outer: get_outer_lite,
     reorder_axes: get_reorder_axes_lite,
     max : get_max_lite,
+    min : get_min_lite,
     # inner : get_inner_lite,
     # average : get_average_lite,
-    # min : get_min_lite,
 }
 
 # Function that returns function that returns class

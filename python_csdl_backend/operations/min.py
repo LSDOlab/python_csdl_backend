@@ -4,23 +4,24 @@ from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.sparse_utils import get_sparsity
+from python_csdl_backend.operations.max import ScalarExtremumLite
 import numpy as np
 import scipy.sparse as sp
 
 
-def get_max_lite(op):
+def get_min_lite(op):
     if len(op.dependencies) == 1 and op.literals['axis'] != None:
-        return AxisMaxLite
+        return AxisMinLite
     elif len(op.dependencies) > 1 and op.literals['axis'] == None:
-        return ElementwiseMaxLite
+        return ElementwiseMinLite
     elif len(op.dependencies) == 1 and op.literals['axis'] == None:
-        return ScalarExtremumMaxLite
+        return ScalarExtremumMinLite
 
 
-class AxisMaxLite(OperationBase):
+class AxisMinLite(OperationBase):
 
     def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):
-        op_name = 'axismax'
+        op_name = 'axismin'
         name = f'{name}_{op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
 
@@ -65,7 +66,8 @@ class AxisMaxLite(OperationBase):
 
     def get_evaluation(self, eval_block, vars):
 
-        def compute_max(in_val):
+        def compute_min(in_val_val):
+            in_val = -in_val_val
             g_max = np.max(in_val, axis=self.axis)
             g_diff = in_val - np.einsum(
                 self.einsum_str,
@@ -74,10 +76,10 @@ class AxisMaxLite(OperationBase):
             )
             exponents = np.exp(self.rho * g_diff)
             summation = np.sum(exponents, axis=self.axis)
-            result = g_max + 1.0 / self.rho * np.log(summation)
+            result = -g_max - 1.0 / self.rho * np.log(summation)
             return result
 
-        vars[self.name] = compute_max
+        vars[self.name] = compute_min
         eval_block.write(f'{self.out_id} = {self.name}({self.in_id})')
 
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
@@ -87,7 +89,8 @@ class AxisMaxLite(OperationBase):
         output = key_tuple[0].id
         partial_name = partials_dict[key_tuple]['name']
 
-        def compute_max_deriv(in_val):
+        def compute_min_deriv(in_val_val):
+            in_val = - in_val_val
             g_max = np.max(in_val, axis=self.axis)
             g_diff = in_val - np.einsum(
                 self.einsum_str,
@@ -110,7 +113,7 @@ class AxisMaxLite(OperationBase):
         row_name = self.name+'_rows'
         col_name = self.name+'_cols'
 
-        vars[partials_name] = compute_max_deriv
+        vars[partials_name] = compute_min_deriv
         vars[row_name] = self.rows
         vars[col_name] = self.cols
 
@@ -130,10 +133,10 @@ class AxisMaxLite(OperationBase):
         return False
 
 
-class ElementwiseMaxLite(OperationBase):
+class ElementwiseMinLite(OperationBase):
 
     def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):
-        op_name = 'elementmax'
+        op_name = 'elementmin'
         name = f'{name}_{op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
 
@@ -153,13 +156,13 @@ class ElementwiseMaxLite(OperationBase):
 
     def get_evaluation(self, eval_block, vars):
 
-        eval_block.write(f'fmax = {self.in_ids[0]} - 1')
+        eval_block.write(f'fmax = -{self.in_ids[0]} - 1')
         for in_name in self.in_ids:
-            eval_block.write(f'fmax = np.maximum(fmax, {in_name})')
+            eval_block.write(f'fmax = np.maximum(fmax, -{in_name})')
         eval_block.write(f'arg = 0.0')
         for in_name in self.in_ids:
-            eval_block.write(f'arg += np.exp({self.rho} * ({in_name} - fmax))')
-        eval_block.write(f'{self.out_id} = (fmax + 1. / {self.rho} * np.log(arg))')
+            eval_block.write(f'arg += np.exp({self.rho} * (-{in_name} - fmax))')
+        eval_block.write(f'{self.out_id} = -(fmax + 1. / {self.rho} * np.log(arg))')
 
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
 
@@ -168,19 +171,19 @@ class ElementwiseMaxLite(OperationBase):
         vars[row_name] = self.rows
         vars[col_name] = self.cols
 
-        partials_block.write(f'fmax = {self.in_ids[0]} - 1')
+        partials_block.write(f'fmax = -{self.in_ids[0]} - 1')
         for in_name in self.in_ids:
-            partials_block.write(f'fmax = np.maximum(fmax, {in_name})')
+            partials_block.write(f'fmax = np.maximum(fmax, -{in_name})')
         partials_block.write(f'arg = 0.0')
         for in_name in self.in_ids:
-            partials_block.write(f'arg += np.exp({self.rho} * ({in_name} - fmax))')
+            partials_block.write(f'arg += np.exp({self.rho} * (-{in_name} - fmax))')
 
         for key_tuple in partials_dict:
             input = key_tuple[1].id
             output = key_tuple[0].id
             partial_name = partials_dict[key_tuple]['name']
 
-            partials_block.write(f'temp = (1. / arg * np.exp({self.rho} * ({input} - fmax))).flatten()')
+            partials_block.write(f'temp = (1. / arg * np.exp({self.rho} * (-{input} - fmax))).flatten()')
             if is_sparse_jac:
                 partials_block.write(f'{partial_name} = sp.csc_matrix((temp,({row_name},{col_name})),shape = ({self.outsize},{self.insize}))')
             else:
@@ -196,93 +199,9 @@ class ElementwiseMaxLite(OperationBase):
         return False
 
 
-class ScalarExtremumLite(OperationBase):
+class ScalarExtremumMinLite(ScalarExtremumLite):
 
     def __init__(self, operation, nx_inputs, nx_outputs, name='', **kwargs):
-        op_name = 'scalar_extremum_max'
-        name = f'{name}_{op_name}'
+        name = 'min'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
-
-        shape = operation.dependencies[0].shape
-        in_name = operation.dependencies[0].name
-        self.in_id = self.get_input_id(in_name)
-        out_name = operation.outs[0].name
-        self.out_id = self.get_output_id(out_name)
-        self.rho = operation.literals['rho']
-        self.val = operation.dependencies[0].val
-
-        in_shape = tuple(shape)
-        out_shape = (1,)
-        self.shape = shape
-
-        self.outsize = np.prod(out_shape)
-        self.insize = np.prod(in_shape)
-
-        # out_indices = np.arange(np.prod(out_shape)).reshape(out_shape)
-        # in_indices = np.arange(np.prod(in_shape)).reshape(in_shape)
-
-    def get_evaluation(self, eval_block, vars):
-
-        def compute_max(in_val):
-            if self.lower_flag:
-                g_max = np.max(-in_val)
-                g_diff = -in_val - g_max
-            else:
-                g_max = np.max(in_val)
-                g_diff = in_val - g_max
-
-            exponents = np.exp(self.rho * g_diff)
-            summation = np.sum(exponents)
-            result = (g_max + 1.0 / self.rho * np.log(summation)).reshape(1,)
-            return result
-
-        vars[self.name] = compute_max
-        if self.lower_flag:
-            eval_block.write(f'{self.out_id} = -{self.name}({self.in_id})')
-        else:
-            eval_block.write(f'{self.out_id} = {self.name}({self.in_id})')
-
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
-
-        key_tuple = get_only(partials_dict)
-        input = key_tuple[1].id
-        output = key_tuple[0].id
-        partial_name = partials_dict[key_tuple]['name']
-
-        def compute_max_deriv(in_val):
-            if self.lower_flag:
-                g_max = np.max(-in_val)
-                g_diff = -in_val - g_max
-            else:
-                g_max = np.max(in_val)
-                g_diff = in_val - g_max
-
-            exponents = np.exp(self.rho * g_diff)
-            summation = np.sum(exponents)
-
-            dsum_dg = self.rho * exponents
-            dKS_dsum = 1.0 / (self.rho * summation * np.ones(self.shape))
-            dKS_dg = (dKS_dsum * dsum_dg).reshape((self.outsize, self.insize))
-            return dKS_dg
-
-        partials_name = self.name+'_partials'
-
-        vars[partials_name] = compute_max_deriv
-
-        partials_block.write(f'temp = {partials_name}({input})')
-        if is_sparse_jac:
-            partials_block.write(f'{partial_name} = sp.csc_matrix(temp)')
-        else:
-            partials_block.write(f'{partial_name}= temp')
-
-    def determine_sparse(self):
-        if self.insize < 100:
-            return False
-        return True
-
-class ScalarExtremumMaxLite(ScalarExtremumLite):
-
-    def __init__(self, operation, nx_inputs, nx_outputs,name='', **kwargs):
-        name = 'max'
-        super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
-        self.lower_flag = False
+        self.lower_flag = True
