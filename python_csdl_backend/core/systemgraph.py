@@ -204,10 +204,11 @@ class SystemGraph(object):
                         declared_to_bool = True
                     else:
                         declared_to_bool = False
-                        
+
                     if node.promoted_id in self.rep.promoted_to_node:
                         if not isinstance(node.var, (Output, Input)):
-                            f.write(f'\tWARNING: this declared variable is not a promotion or connection target.\n')
+                            if np.array_equal(node.var.val, np.ones(node.var.shape)):
+                                f.write(f'\tWARNING: this declared variable is not a promotion or connection target with a value being set.\n')
 
                     f.write(f'\tCONNECTED TO: {connected_to_bool}\n')
                     for connected_to_node in node.connected_to:
