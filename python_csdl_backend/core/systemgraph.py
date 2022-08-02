@@ -212,10 +212,10 @@ class SystemGraph(object):
 
                     f.write(f'\tCONNECTED TO: {connected_to_bool}\n')
                     for connected_to_node in node.connected_to:
-                        f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}\n')
+                        f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}.{connected_to_node.name}\n')
                     f.write(f'\tPROMOTED TO: {declared_to_bool}\n')
                     for connected_to_node in node.declared_to:
-                        f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}\n')
+                        f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}.{connected_to_node.name}\n')
 
                 # Write predecessors
                 f.write(f'\tPREDECESSORS\n')

@@ -6,6 +6,7 @@ from python_csdl_backend.core.operation_map import csdl_to_back_map
 from python_csdl_backend.core.systemgraph import SystemGraph
 from python_csdl_backend.utils.general_utils import get_deriv_name, to_list, lineup_string, set_opt_upper_lower
 import warnings
+# import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -208,13 +209,14 @@ class Simulator(SimulatorBase):
         new_states = self.eval_instructions.execute(eval_vars)
 
         if self.recorder:
-
+            # start = time.time()
             save_dict = {}
             for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
-                print(var_name)
                 save_dict[var_name] = new_states[self._find_unique_id(var_name)]
 
             self.recorder.record(save_dict, 'simulator')
+            # print('RECORDING TIME:', time.time() - start)
+
         return new_states
 
     def _generate_totals(self, of, wrt):
@@ -407,6 +409,13 @@ class Simulator(SimulatorBase):
         else:
             return None
 
+    def _get_unique_node(self, key):
+        """
+        Given a language variable name,
+        see is variable name exists. If so, return unique VariableNode
+        """
+        return self.system_graph.unique_to_node[self._find_unique_id(key)]
+
     def check_variable_existence(self, vars):
         """
         return error if variable does not exist
@@ -418,7 +427,7 @@ class Simulator(SimulatorBase):
             if not self._find_unique_id(var):
                 raise KeyError(f'cannot find variable \'{var}\'')
 
-    def check_totals(self, of=None, wrt=None, compact_print=True):
+    def check_totals(self, of=None, wrt=None, compact_print=True, step = 1e-6):
         """
             checks total derivatives using finite difference.
 
@@ -474,21 +483,24 @@ class Simulator(SimulatorBase):
             output_info = {}
             all_output_dict = self.variable_info['outputs']
             for of_var in of_list:
-                if of_var not in all_output_dict:
-                    raise KeyError(f'output {of_var} not found.')
+                # 'of' variables can be any variable in the model
+                of_node = self._get_unique_node(of_var)
                 output_info[of_var] = {}
-                output_info[of_var]['shape'] = all_output_dict[of_var]['shape']
-                output_info[of_var]['size'] = all_output_dict[of_var]['size']
+                output_info[of_var]['shape'] = of_node.var.shape
+                output_info[of_var]['size'] = np.prod(of_node.var.shape)
 
             input_info = {}
             all_leaf_dict = self.variable_info['leaf_start']
             for wrt_var in wrt_list:
-                if wrt_var not in all_leaf_dict:
-                    raise KeyError(f'input variable {wrt_var} not found. can only check derivatives with respect to inputs')
+                # 'wrt_var' variable must be a leaf node
+                wrt_node = self._get_unique_node(wrt_var)
+
+                if len(list(self.system_graph.eval_graph.predecessors(wrt_node))) > 0:
+                    raise KeyError(f'\'{wrt_var}\' must not be an output of an operation.')
 
                 input_info[wrt_var] = {}
-                input_info[wrt_var]['shape'] = all_leaf_dict[wrt_var]['shape']
-                input_info[wrt_var]['size'] = all_leaf_dict[wrt_var]['size']
+                input_info[wrt_var]['shape'] = wrt_node.var.shape
+                input_info[wrt_var]['size'] = np.prod(wrt_node.var.shape)
 
         # compute analytical
         analytical_derivs = self.compute_totals(
@@ -500,7 +512,7 @@ class Simulator(SimulatorBase):
         fd_derivs = {}
         for input_name in input_info:
             input_dict = input_info[input_name]
-            fd_derivs.update(self._compute_fd_partial(input_name, input_dict, output_info))
+            fd_derivs.update(self._compute_fd_partial(input_name, input_dict, output_info, delta = step))
 
         # compute error
         error_dict = {}
@@ -596,7 +608,7 @@ class Simulator(SimulatorBase):
 
         return error_dict
 
-    def _compute_fd_partial(self, input_name, input_dict, outputs_dict, delta=1e-6):
+    def _compute_fd_partial(self, input_name, input_dict, outputs_dict, delta):
 
         input_size = input_dict['size']
         input_shape = input_dict['shape']
@@ -842,6 +854,13 @@ class Simulator(SimulatorBase):
         """
         self.recorder = recorder
 
+        save_dict = {}
+        for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
+            self.check_variable_existence(var_name)
+            save_dict[var_name] = self.state_vals[self._find_unique_id(var_name)]
+
+        self.recorder.record(save_dict, 'simulator')
+
     def check_if_optimization(self, opt_bool):
         """
         raise error if opt_bool == False
@@ -849,3 +868,24 @@ class Simulator(SimulatorBase):
 
         if not opt_bool:
             raise KeyError('given representation does not specify design variables and an objective.')
+
+    # def find_variables_between(self, source_name, target_name):
+    #     """
+    #     EXPERIMENTAL: lists all variables between source and target
+    #     """
+    #     list_of_vars = []
+    #     self.check_variable_existence([source_name, target_name])
+    #     s_id = self._find_unique_id(source_name)
+    #     tgt_id = self._find_unique_id(target_name)
+    #     source_node = self.system_graph.unique_to_node[s_id]
+    #     tgt_node = self.system_graph.unique_to_node[tgt_id]
+
+    #     nodes_between_set = {}
+    #     paths_between_generator = nx.all_simple_paths(self.system_graph.eval_graph, source=source_node, target=tgt_node)
+    #     for path in paths_between_generator:
+    #         for node in path:
+    #             if isinstance(node, VariableNode):
+    #                 if isinstance(node.var, (Output, Input)):
+    #                     nodes_between_set.add(node.promoted_id)
+
+    #     return nodes_between_set

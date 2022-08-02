@@ -10,6 +10,20 @@ class SampleModel(csdl.Model):
         y = self.declare_variable('y')
         self.register_output('f', x+1+y)
 
+
+class SampleModel2(csdl.Model):
+    def define(self):
+        x = self.create_input('x')
+
+        m = csdl.Model()
+        y = m.declare_variable('x')
+        z = m.register_output('y', y*3+y)
+        self.add(m, name = 'm')
+
+        z1 = self.declare_variable('y')
+
+        self.register_output('f', x+1+z1)
+
 # TODO: add test to raise error if simulator mode argument is wrong
 
 # TODO: add test to raise error if simulator model argument is wrong
@@ -51,5 +65,12 @@ def test_check_totals_no_of():
     sim = Simulator(SampleModel())
     sim.run()
 
-    with pytest.raises(KeyError):
-        sim.check_totals(of='y', wrt='x')
+    t = sim.check_totals(of='y', wrt='x')
+    np.testing.assert_almost_equal(len(t), 1)
+
+def test_check_totals_no_of():
+    sim = Simulator(SampleModel2())
+    sim.run()
+
+    t = sim.check_totals(of='y', wrt='x')
+    np.testing.assert_almost_equal(len(t), 1)

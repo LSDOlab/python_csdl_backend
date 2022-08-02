@@ -17,6 +17,7 @@ class BracketedSolver(ImplicitSolverBase):
         self.ordered_in_brackets = bracket_vars_jump
 
         self.max_iter = op.maxiter
+        self.max_iter = 100
         self.tol = 1e-12
 
     def _solve_implicit(self):
@@ -104,6 +105,7 @@ class BracketedSolver(ImplicitSolverBase):
 
         # Main bisection loop
         x = dict()
+        bad_res = (0,'none')
         for iter_num in range(self.max_iter):
 
             # Compute midpoint of upper and lower bounds
@@ -121,6 +123,7 @@ class BracketedSolver(ImplicitSolverBase):
                 # print(f'ITERATION {iter_num} {residual_name}: {res_norm}')
 
                 if res_norm >= self.tol:
+                    bad_res = (res_norm, residual_name)
                     converged = False
             if converged:
                 # break loop if all residuals are sufficiently small
@@ -137,11 +140,13 @@ class BracketedSolver(ImplicitSolverBase):
                 xn[state_name][mask_n] = x[state_name][mask_n]
 
         # solver terminates:
-        if not converged:
-            warnings.warn(f'nonlinear solver: bracketed search did not converge in {self.max_iter} iterations.')
+        # if not converged:
+        #     warnings.warn(f'nonlinear solver: bracketed search did not converge in {self.max_iter} iterations.')
 
         # print status of nlsolver
         print(nl_solver_completion_status('bracketed search', iter_num, self.tol, converged))
+        if not converged:
+            print('norm', bad_res[0], '\tname', bad_res[1])
 
         # for residual_name, res_dict in self.residuals.items():
         #     state_name = res_dict['state']
