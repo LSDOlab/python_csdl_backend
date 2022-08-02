@@ -4,7 +4,8 @@ from csdl import SimulatorBase, Model, Operation, ImplicitOperation, GraphRepres
 from python_csdl_backend.core.instructions import Instructions
 from python_csdl_backend.core.operation_map import csdl_to_back_map
 from python_csdl_backend.core.systemgraph import SystemGraph
-from python_csdl_backend.utils.general_utils import get_deriv_name, to_list, lineup_string, set_opt_upper_lower
+from python_csdl_backend.utils.general_utils import get_deriv_name, to_list, lineup_string, set_opt_upper_lower, set_scaler_array
+from python_csdl_backend.utils.custom_utils import check_not_implemented_args
 import warnings
 # import time
 
@@ -21,7 +22,8 @@ class Simulator(SimulatorBase):
                  mode='rev',
                  analytics=False,
                  sparsity='auto',
-                 display_scripts=False):
+                 display_scripts=False,
+                 root=True):
         """
         CSDL compiler backend. Evaluates model and derivatives.
 
@@ -32,6 +34,9 @@ class Simulator(SimulatorBase):
 
             mode: str
                 String specifying which method to compute derivatives. (accepts only 'rev')
+
+            root: bool
+                If True, this simulator is the top level simulator. If False, this simulator is part of an implicit operation.
 
             analytics: bool
                 (EXPERIMENTAL) Writes all nodes and their predecessors to a text file.
@@ -47,6 +52,9 @@ class Simulator(SimulatorBase):
         """
         self.display_scripts = display_scripts
         self.recorder = None
+        if not isinstance(root, bool):
+            raise TypeError('root argument must be True or False.')
+        self.root = root
 
         # check modes
         self.mode = mode
@@ -192,30 +200,61 @@ class Simulator(SimulatorBase):
         adj_instructions.compile()
         return adj_instructions, pre_vars
 
-    def run(self):
+    def run(
+            self,
+            failure_flag=False,
+            save=True,
+            **kwargs):
         """
         Run model.
+
+        Parameters:
+        -----------
+            failure_flag: bool
+                If True, returns False if run evaluation throws exception and returns True if run evalulation completes succesfully.
+                If False, does not return anything.
+            save: bool
+                If True, saves variable to recorder (if add_recorder is not called, nothing will be saved)
         """
         # Execute compiled code, return all evaluated variables
-        new_states = self._run(self.state_vals)
+        if not failure_flag:
+            new_states = self._run(self.state_vals, **kwargs)
+        else:
+            try:
+                new_states = self._run(self.state_vals, **kwargs)
+                completed = True
+            except:
+                completed = False
+                return completed
+
         self.ran_bool = True
+
+        if self.recorder:
+            if save:
+                # start = time.time()
+                save_dict = {}
+                for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
+                    save_dict[var_name] = new_states[self._find_unique_id(var_name)]
+
+                self.recorder.record(save_dict, 'simulator')
+                # print('RECORDING TIME:', time.time() - start)
 
         for key in self.state_vals:
             self.state_vals[key] = new_states[key]
 
-    def _run(self, states):
+        if failure_flag:
+            return completed
+
+    def _run(
+        self,
+        states,
+    ):
+        """
+        Parameters:
+        """
 
         eval_vars = {**states, **self.preeval_vars}
         new_states = self.eval_instructions.execute(eval_vars)
-
-        if self.recorder:
-            # start = time.time()
-            save_dict = {}
-            for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
-                save_dict[var_name] = new_states[self._find_unique_id(var_name)]
-
-            self.recorder.record(save_dict, 'simulator')
-            # print('RECORDING TIME:', time.time() - start)
 
         return new_states
 
@@ -427,7 +466,7 @@ class Simulator(SimulatorBase):
             if not self._find_unique_id(var):
                 raise KeyError(f'cannot find variable \'{var}\'')
 
-    def check_totals(self, of=None, wrt=None, compact_print=True, step = 1e-6):
+    def check_totals(self, of=None, wrt=None, compact_print=True, step=1e-6):
         """
             checks total derivatives using finite difference.
 
@@ -512,7 +551,7 @@ class Simulator(SimulatorBase):
         fd_derivs = {}
         for input_name in input_info:
             input_dict = input_info[input_name]
-            fd_derivs.update(self._compute_fd_partial(input_name, input_dict, output_info, delta = step))
+            fd_derivs.update(self._compute_fd_partial(input_name, input_dict, output_info, delta=step))
 
         # compute error
         error_dict = {}
@@ -653,9 +692,12 @@ class Simulator(SimulatorBase):
         # to extract information to send to modopt
         self.total_dv_size = 0
         for dv_name, dv_dict in self.dvs.items():
+            check_not_implemented_args(None, dv_dict, 'design_var')
             dv_node = dv_dict['node']
             dv_shape = dv_node.var.shape
             dv_size = np.prod(dv_shape)
+            dv_dict['scaler'] = set_scaler_array(dv_dict['scaler'], dv_name, dv_shape)
+            dv_scaler = dv_dict['scaler']
 
             dv_dict['size'] = dv_size
             dv_dict['shape'] = dv_shape
@@ -664,14 +706,17 @@ class Simulator(SimulatorBase):
             dv_dict['index_upper'] = self.total_dv_size
 
             # process lower and upper bounds
-            dv_dict['lower'] = set_opt_upper_lower(dv_dict['lower'], dv_name, dv_shape, 'lower')
-            dv_dict['upper'] = set_opt_upper_lower(dv_dict['upper'], dv_name, dv_shape, 'upper')
+            dv_dict['lower'] = set_opt_upper_lower(dv_dict['lower'], dv_name, dv_shape, 'lower', dv_scaler)
+            dv_dict['upper'] = set_opt_upper_lower(dv_dict['upper'], dv_name, dv_shape, 'upper', dv_scaler)
 
         self.total_constraint_size = 0
         for c_name, c_dict in self.cvs.items():
+            check_not_implemented_args(None, c_dict, 'constraint')
             c_node = c_dict['node']
             c_shape = c_node.var.shape
             c_size = np.prod(c_shape)
+            c_dict['scaler'] = set_scaler_array(c_dict['scaler'], c_name, c_shape)
+            c_scaler = c_dict['scaler']
 
             c_dict['size'] = c_size
             c_dict['shape'] = c_shape
@@ -680,8 +725,17 @@ class Simulator(SimulatorBase):
             c_dict['index_upper'] = self.total_constraint_size
 
             # process lower and upper bounds
-            c_dict['lower'] = set_opt_upper_lower(c_dict['lower'], c_name, c_shape, 'lower')
-            c_dict['upper'] = set_opt_upper_lower(c_dict['upper'], c_name, c_shape, 'upper')
+            c_dict['lower'] = set_opt_upper_lower(c_dict['lower'], c_name, c_shape, 'lower', c_scaler)
+            c_dict['upper'] = set_opt_upper_lower(c_dict['upper'], c_name, c_shape, 'upper', c_scaler)
+
+            if not isinstance(c_dict['equals'], (np.ndarray)):
+                if c_dict['equals'] is not None: # if this is a scalar
+                    c_dict['equals'] = c_scaler*c_dict['equals']
+            elif isinstance(c_dict['equals'], np.ndarray):
+                c_dict['equals'] = c_scaler*(c_dict['equals'].reshape(c_shape))
+
+        check_not_implemented_args(None, self.obj, 'objective')
+        self.obj['scaler'] = set_scaler_array(self.obj['scaler'], self.obj['name'], (1,))
 
     def get_design_variable_metadata(self):
         # return error if not optimization problem
@@ -701,8 +755,9 @@ class Simulator(SimulatorBase):
         for dv_name, dv_dict in self.dvs.items():
             i_lower = dv_dict['index_lower']
             i_upper = dv_dict['index_upper']
+            scaler = dv_dict['scaler'].flatten()
             shape = dv_dict['shape']
-            new_val = x[i_lower:i_upper]
+            new_val = x[i_lower:i_upper]/scaler
             dv_id = self._find_unique_id(dv_name)
 
             self.state_vals[dv_id] = new_val.reshape(shape)
@@ -730,7 +785,8 @@ class Simulator(SimulatorBase):
         self.check_if_optimization(self.opt_bool)
 
         obj_name = self.obj['name']
-        return self[obj_name]
+        scaler = self.obj['scaler']
+        return self[obj_name]*scaler
 
     def constraints(self):
         """
@@ -745,9 +801,10 @@ class Simulator(SimulatorBase):
             i_lower = c_dict['index_lower']
             i_upper = c_dict['index_upper']
             shape = c_dict['shape']
+            scaler = c_dict['scaler'].flatten()
             c_id = self._find_unique_id(c_name)
             c_val = self.state_vals[c_id].flatten()
-            constraint_vec[i_lower:i_upper] = c_val
+            constraint_vec[i_lower:i_upper] = c_val*scaler
 
         return constraint_vec
 
@@ -761,9 +818,10 @@ class Simulator(SimulatorBase):
             i_lower = dv_dict['index_lower']
             i_upper = dv_dict['index_upper']
             shape = dv_dict['shape']
+            scaler = dv_dict['scaler'].flatten()
             dv_id = self._find_unique_id(dv_name)
             dv_val = self.state_vals[dv_id].flatten()
-            dv_vec[i_lower:i_upper] = dv_val
+            dv_vec[i_lower:i_upper] = dv_val*scaler
 
         return dv_vec
 
@@ -774,14 +832,16 @@ class Simulator(SimulatorBase):
 
         obj_gradient = np.zeros(self.total_dv_size)
         obj_name = self.obj['name']
+        obj_scaler = self.obj['scaler']
         for dv_name, dv_dict in self.dvs.items():
             i_lower = dv_dict['index_lower']
             i_upper = dv_dict['index_upper']
+            d_scaler = dv_dict['scaler'].flatten()
 
             if sp.issparse(self.optimization_derivatives[obj_name, dv_name]):
-                obj_gradient[i_lower:i_upper] = (self.optimization_derivatives[obj_name, dv_name].toarray()).flatten()
+                obj_gradient[i_lower:i_upper] = (self.optimization_derivatives[obj_name, dv_name].toarray()).flatten()*(obj_scaler/d_scaler)
             else:
-                obj_gradient[i_lower:i_upper] = (self.optimization_derivatives[obj_name, dv_name]).flatten()
+                obj_gradient[i_lower:i_upper] = (self.optimization_derivatives[obj_name, dv_name]).flatten()*(obj_scaler/d_scaler)
 
         return obj_gradient
 
@@ -794,10 +854,16 @@ class Simulator(SimulatorBase):
         for c_name, c_dict in self.cvs.items():
             i_lower_c = c_dict['index_lower']
             i_upper_c = c_dict['index_upper']
+            c_scaler = c_dict['scaler'].flatten()
             for dv_name, dv_dict in self.dvs.items():
                 i_lower_dv = dv_dict['index_lower']
                 i_upper_dv = dv_dict['index_upper']
-                constraint_jac[i_lower_c:i_upper_c, i_lower_dv:i_upper_dv] = self.optimization_derivatives[c_name, dv_name]
+                d_scaler = dv_dict['scaler'].flatten()
+                scaler_outer = np.outer(c_scaler, 1.0/d_scaler)
+                if sp.issparse(self.optimization_derivatives[c_name, dv_name]):
+                    constraint_jac[i_lower_c:i_upper_c, i_lower_dv:i_upper_dv] = (self.optimization_derivatives[c_name, dv_name].toarray())*(scaler_outer)
+                else:
+                    constraint_jac[i_lower_c:i_upper_c, i_lower_dv:i_upper_dv] = self.optimization_derivatives[c_name, dv_name]*(scaler_outer)
         return constraint_jac
 
     def check_partials(self,

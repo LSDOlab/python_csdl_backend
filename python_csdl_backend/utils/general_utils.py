@@ -78,35 +78,58 @@ def set_opt_upper_lower(
     value,
     var_name,
     shape,
-    bound_type
+    bound_type,
+    scaler,
 ):
     """
-    Processes constraint and design variable upper and lower bounds
-    """
+    Processes constraint and design variable upper and lower bounds.
 
+    scaler is a numpy array in the shape of shape.
+    """
     if isinstance(value, np.ndarray):  # if numpy array
         value_size = np.prod(value.shape)
         if value_size == np.prod(shape):
-            return_array = value.reshape(shape)
+            return_array = value.reshape(shape)*scaler
         elif value_size == 1:
-            return_array = np.ones(shape)*value.reshape((1,))
+            return_array = (np.ones(shape)*value.reshape((1,)))*scaler
         else:
             raise ValueError(f'Optimization variable {var_name} {bound_type} bound shape is incompatible')
-    elif isinstance(value, list): # if list, convert to numpy
+    elif isinstance(value, list):  # if list, convert to numpy
         value = np.array(value)
         value_size = np.prod(value.shape)
         if value_size == np.prod(shape):
-            return_array = value.reshape(shape)
+            return_array = value.reshape(shape)*scaler
         elif value_size == 1:
-            return_array = np.ones(shape)*value.reshape((1,))
+            return_array = (np.ones(shape)*value.reshape((1,)))*scaler
         else:
             raise ValueError(f'Optimization variable {var_name} {bound_type} bound shape is incompatible')
-    elif value is None: # if None, give max bounds
+    elif value is None:  # if None, give max bounds
         if bound_type == 'lower':
             return_array = np.ones(shape)*(-1.0e30)
         elif bound_type == 'upper':
             return_array = np.ones(shape)*(1.0e30)
-    else: # Hopefully when it reaches here, its a scalar...
-        return_array = np.ones(shape)*value
+    else:  # Hopefully when it reaches here, its a scalar...
+        return_array = (np.ones(shape)*value)*scaler
+
+    return return_array
+
+
+def set_scaler_array(
+    scaler,
+    var_name,
+    shape,
+):
+    if isinstance(scaler, np.ndarray):  # if numpy array
+        scaler_size = np.prod(scaler.shape)
+        if scaler_size == np.prod(shape):
+            return_array = scaler.reshape(shape)
+        elif scaler_size == 1:
+            return_array = np.ones(shape)*scaler.reshape((1,))
+        else:
+            raise ValueError(f'Optimization variable {var_name} scalar shape is incompatible')
+    elif scaler is None:  # no scaler
+        return_array = np.ones(shape)
+    else:  # scalar scaler
+        return_array = np.ones(shape)*scaler
 
     return return_array

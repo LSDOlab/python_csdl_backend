@@ -43,13 +43,56 @@ def check_not_implemented_args(op, given_metadata_dict, type_str):
             'form': None,
             'step_calc': None,
         }
+    elif type_str == 'design_var':
+        not_implemented = {
+            'ref': None,
+            'ref0': None,
+            'indices': None,
+            'adder': None,
+            'parallel_deriv_color': None,
+            'cache_linear_solution': False,
+        }
+    elif type_str == 'constraint':
+        not_implemented = {
+            'ref': None,
+            'ref0': None,
+            'adder': None,
+            'indices': None,
+            'linear': False,
+            'parallel_deriv_color': None,
+            'cache_linear_solution': False,
+        }
+    elif type_str == 'objective':
+        not_implemented = {
+            'ref': None,
+            'ref0': None,
+            'index': None,
+            'adder': None,
+            'parallel_deriv_color': None,
+            'cache_linear_solution': False,
+        }
+    else:
+        raise KeyError(f'dev error: data type {type_str} unknown')
 
     for var in given_metadata_dict:
-        temp = given_metadata_dict[var]
+
+        if op is not None:
+            temp = given_metadata_dict[var]
+        else:
+            temp = given_metadata_dict
 
         for key_dont in not_implemented:
+            if not isinstance(temp[key_dont], type(not_implemented[key_dont])):
+                if op is not None:
+                    raise NotImplementedError(f'argument \'{key_dont}\' for CustomOperation has not been implemented in this backend. {type_str} \'{var}\' in {type(op)} cannot be processed.')
+                else:
+                    raise NotImplementedError(f'argument \'{key_dont}\' for \'{type_str}\' argument has not been implemented in this backend.')
+
             if temp[key_dont] != not_implemented[key_dont]:
-                raise NotImplementedError(f'argument \'{key_dont}\' for CustomExplicitOperation has not been implemented in this backend. {type_str} \'{var}\' in {type(op)} cannot be processed.')
+                if op is not None:
+                    raise NotImplementedError(f'argument \'{key_dont}\' for CustomOperation has not been implemented in this backend. {type_str} \'{var}\' in {type(op)} cannot be processed.')
+                else:
+                    raise NotImplementedError(f'argument \'{key_dont}\' for \'{type_str}\' argument has not been implemented in this backend.')
 
 
 def process_custom_derivatives_metadata(derivative_dict, out_dict, in_dict):
