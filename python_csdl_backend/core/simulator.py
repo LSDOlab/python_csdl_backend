@@ -202,7 +202,7 @@ class Simulator(SimulatorBase):
 
     def run(
             self,
-            failure_flag=False,
+            check_failure=False,
             save=True,
             **kwargs):
         """
@@ -217,15 +217,15 @@ class Simulator(SimulatorBase):
                 If True, saves variable to recorder (if add_recorder is not called, nothing will be saved)
         """
         # Execute compiled code, return all evaluated variables
-        if not failure_flag:
+        if not check_failure:
             new_states = self._run(self.state_vals, **kwargs)
         else:
             try:
                 new_states = self._run(self.state_vals, **kwargs)
-                completed = True
+                failure_flag = False
             except:
-                completed = False
-                return completed
+                failure_flag = True
+                return failure_flag
 
         self.ran_bool = True
 
@@ -242,8 +242,8 @@ class Simulator(SimulatorBase):
         for key in self.state_vals:
             self.state_vals[key] = new_states[key]
 
-        if failure_flag:
-            return completed
+        if check_failure:
+            return failure_flag
 
     def _run(
         self,

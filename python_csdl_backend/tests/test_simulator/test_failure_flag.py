@@ -3,14 +3,16 @@ from python_csdl_backend import Simulator
 import pytest
 import numpy as np
 
+
 class SampleModel(csdl.Model):
     def define(self):
         x = self.create_input('x')
         y = self.declare_variable('y')
 
-        f = csdl.custom(x, y, op = Custom())
+        f = csdl.custom(x, y, op=Custom())
 
         self.register_output('f', f)
+
 
 class Custom(csdl.CustomExplicitOperation):
 
@@ -30,8 +32,8 @@ class Custom(csdl.CustomExplicitOperation):
 
     def compute_derivatives(self, inputs, derivatives):
 
-        derivatives['f', 'x'] =  np.ones((1,1))
-        derivatives['f', 'y'] =  np.ones((1,1))
+        derivatives['f', 'x'] = np.ones((1, 1))
+        derivatives['f', 'y'] = np.ones((1, 1))
 
 
 def test_check_no_failure_flag():
@@ -41,26 +43,28 @@ def test_check_no_failure_flag():
     with pytest.raises(ValueError):
         sim.run()
 
+
 def test_check_failure_flag():
     sim = Simulator(SampleModel())
     sim.run()
     sim['x'] = -1
-    completed = sim.run(failure_flag=True)
-    assert completed == False
+    failure_flag = sim.run(check_failure=True)
+    assert failure_flag == True
 
 
 def test_completed_failure_flag():
     sim = Simulator(SampleModel())
     sim.run()
     sim['x'] = 2
-    completed = sim.run(failure_flag=True)
-    assert completed == True
+    failure_flag = sim.run(check_failure=True)
+    assert failure_flag == False
+
 
 def test_normal_failure_flag():
     sim = Simulator(SampleModel())
     sim.run()
     sim['x'] = 2
-    sim.run(failure_flag=True)
+    sim.run(check_failure=True)
     np.testing.assert_almost_equal(sim['f'], 3)
 
     checks = sim.check_partials()
