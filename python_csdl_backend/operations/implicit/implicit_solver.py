@@ -63,9 +63,7 @@ class ImplicitSolverBase():
             else:
                 self.brackets_map[state_bracket_name] = (self.brackets_map[state_bracket_name][0], inputs[i+j+1])
 
-        # Set initial guess:
-        # for state_name in self.states:
-        #     self.function_wrapper.set_state(state_name, self.states[state_name]['initial_val'])
+        # Initial guess is set using set_guess
 
         # All the initial values are now set. Solve residuals.
         self._solve_implicit()  # method used by subclass
@@ -76,9 +74,6 @@ class ImplicitSolverBase():
         for output in self.ordered_outs:
             return_tuple.append(self.function_wrapper.get_state(output))
             # print(output, self.function_wrapper.get_state(output))
-
-        # for state_name in self.states:
-        #     self.states[state_name]['initial_val'] = self.function_wrapper.get_state(state_name)
 
         return_tuple = tuple(return_tuple)
         return return_tuple
@@ -267,11 +262,3 @@ class ImplicitSolverBase():
         for i, state_name in enumerate(self.states):
             # print(state_name, guesses[i].reshape(self.states[state_name]['shape']))
             self.function_wrapper.set_state(state_name, guesses[i].reshape(self.states[state_name]['shape']))
-
-    def get_guess(self):
-
-        return_tuple = []
-        for state_name in self.states:
-            return_tuple.append(self.function_wrapper.get_state(state_name).reshape(self.states[state_name]['shape']))
-
-        return tuple(return_tuple)

@@ -248,10 +248,15 @@ class Simulator(SimulatorBase):
     def _run(
         self,
         states,
+        remember_implicit_states=True
     ):
         """
         Parameters:
         """
+
+        if remember_implicit_states:
+            self.remember_implicit_states()
+            # print("remember")
 
         eval_vars = {**states, **self.preeval_vars}
         new_states = self.eval_instructions.execute(eval_vars)
@@ -670,7 +675,7 @@ class Simulator(SimulatorBase):
             temp_state[input_id] = temp_state[input_id].reshape(input_shape)
 
             # compute f(x+h)
-            new_states = self._run(temp_state)
+            new_states = self._run(temp_state, remember_implicit_states=False)
 
             # build finite difference jacobian
             for output_name in outputs_dict:
@@ -729,7 +734,7 @@ class Simulator(SimulatorBase):
             c_dict['upper'] = set_opt_upper_lower(c_dict['upper'], c_name, c_shape, 'upper', c_scaler)
 
             if not isinstance(c_dict['equals'], (np.ndarray)):
-                if c_dict['equals'] is not None: # if this is a scalar
+                if c_dict['equals'] is not None:  # if this is a scalar
                     c_dict['equals'] = c_scaler*c_dict['equals']
             elif isinstance(c_dict['equals'], np.ndarray):
                 c_dict['equals'] = c_scaler*(c_dict['equals'].reshape(c_shape))
@@ -934,6 +939,13 @@ class Simulator(SimulatorBase):
 
         if not opt_bool:
             raise KeyError('given representation does not specify design variables and an objective.')
+
+    def remember_implicit_states(self):
+        """
+        sets the initial guesses of all implicit operations as the current solved state
+        """
+        for state_id, guess_id in self.system_graph.all_state_ids_to_guess.items():
+            self.state_vals[guess_id] = self.state_vals[state_id]
 
     # def find_variables_between(self, source_name, target_name):
     #     """

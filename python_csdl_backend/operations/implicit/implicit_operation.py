@@ -105,6 +105,9 @@ class ImplicitLite(OperationBase):
         # -- NLBGS (not yet implemented)
         self.solver = None
 
+        # mapping from state output id to intial state guess name
+        self.state_outid_to_initial_guess = {}
+
     def get_evaluation(self, eval_block, vars):
         # Here we generate code to solve for outputs of implicit operation
 
@@ -133,16 +136,11 @@ class ImplicitLite(OperationBase):
         # solved_outputs = newton_op(inputs)
         eval_block.write(f'{self.operation_name}.set_guess({initial_guesses_arg})')
         eval_block.write(f'{self.operation_name}_out = {self.operation_name}.solve({in_argument})')
-        eval_block.write(f'initial_guesses = {self.operation_name}.get_guess()')
 
         for i, outv in enumerate(self.ordered_out_names):
 
             outv_id = self.get_output_id(outv)
             eval_block.write(f'{outv_id} = {self.operation_name}_out[{i}]')
-
-        for i, state_name in enumerate(self.solver.states):
-            state_guess = self.to_initial_guess_name(state_name)
-            eval_block.write(f'{state_guess} = initial_guesses[{i}]')
 
     def get_accumulation_function(self, input_paths, path_output, partials_block, vars):
         # Here we generate code to continue jacobian accumulation given accumulated paths from output to this implicit operation
@@ -165,7 +163,9 @@ class ImplicitLite(OperationBase):
             partials_block.write(f'{path} = {self.operation_name}_path_in[{i}]')
 
     def set_initial_state_guess(self, state_dict):
+
         for state_name in self.solver.states:
+            self.state_outid_to_initial_guess[self.get_output_id(state_name)] = self.to_initial_guess_name(state_name)
             state_dict[self.to_initial_guess_name(state_name)] = self.solver.states[state_name]['initial_val']
 
     def to_initial_guess_name(self, name):

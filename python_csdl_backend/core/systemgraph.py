@@ -48,9 +48,10 @@ class SystemGraph(object):
         self.constraints = constraints
         self.opt_bool = opt_bool
         self.num_ops = 0
+        self.all_implicit_operations = set() # set of all implicit operations
+        self.all_state_ids_to_guess = {} # maps state ids to the names of the initial guess
 
         self.process_rep()
-        # exit()
 
         # rev or fwd
         self.mode = mode
@@ -340,14 +341,18 @@ class SystemGraph(object):
                 # Create the backend operation
                 if isinstance(csdl_node, StandardOperation):
                     back_operation = get_backend_op(csdl_node)(csdl_node, nx_inputs, nx_outputs, node.name)
+                elif isinstance(csdl_node, CustomExplicitOperation):
+                    back_operation = get_backend_custom_explicit_op(csdl_node)(csdl_node, nx_inputs, nx_outputs, node.name)
                 elif isinstance(csdl_node, (ImplicitOperation, BracketedSearchOperation)):
                     back_operation = get_backend_implicit_op(csdl_node)(csdl_node, nx_inputs, nx_outputs, node.name)
                     back_operation.set_initial_state_guess(state_vals)
-                elif isinstance(csdl_node, CustomExplicitOperation):
-                    back_operation = get_backend_custom_explicit_op(csdl_node)(csdl_node, nx_inputs, nx_outputs, node.name)
+                    self.all_implicit_operations.add(back_operation)
+                    self.all_state_ids_to_guess.update(back_operation.state_outid_to_initial_guess)
                 elif isinstance(csdl_node, CustomImplicitOperation):
                     back_operation = get_backend_custom_implicit_op(csdl_node)(csdl_node, nx_inputs, nx_outputs, node.name)
                     back_operation.set_initial_state_guess(state_vals)
+                    self.all_implicit_operations.add(back_operation)
+                    self.all_state_ids_to_guess.update(back_operation.state_outid_to_initial_guess)
                 else:
                     raise NotImplementedError(f'{csdl_nodes} operation not found')
                 node.back_operation = back_operation
