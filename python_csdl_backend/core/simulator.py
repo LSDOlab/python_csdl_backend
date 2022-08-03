@@ -560,8 +560,8 @@ class Simulator(SimulatorBase):
 
         # compute error
         error_dict = {}
-        for input_name in input_info:
-            for output_name in output_info:
+        for output_name in output_info:
+            for input_name in input_info:
                 analytical_jac = analytical_derivs[output_name, input_name]
                 try:
                     analytical_jac = analytical_jac.A
