@@ -680,8 +680,8 @@ class Simulator(SimulatorBase):
 
                 output_val_perturbed = new_states[output_id].flatten()
                 output_val_original = self.state_vals[output_id].flatten()
-
                 output_check_derivative = (output_val_perturbed - output_val_original)/delta
+                # print(output_name, (output_val_perturbed - output_val_original))
 
                 for row_index in range(output_size):
                     fd_jacs[(output_name, input_name)][row_index, col_index] = output_check_derivative[row_index]

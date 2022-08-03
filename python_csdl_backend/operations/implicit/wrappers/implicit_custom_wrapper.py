@@ -31,6 +31,8 @@ class ImplicitCustomWrapper(ImplicitWrapperBase):
         self.total_state_size = 0
         for state in self.ordered_outs:
             self.states[state] = op.output_meta[state]
+            # print(state, op.output_meta[state])
+            # exit()
 
             self.states[state]['index_lower'] = self.total_state_size
             self.states[state]['size'] = np.prod(self.states[state]['shape'])
@@ -38,7 +40,8 @@ class ImplicitCustomWrapper(ImplicitWrapperBase):
             self.states[state]['index_upper'] = self.total_state_size
 
             # Keep state initial guess for implicit operation ????
-            self.states[state]['initial_val'] = np.ones(self.states[state]['shape'])
+            # self.states[state]['initial_val'] = np.ones(self.states[state]['shape'])
+            self.states[state]['initial_val'] = self.states[state]['val'].reshape(self.states[state]['shape'])
 
         self.residuals = {}
         for state in self.states:
@@ -107,6 +110,7 @@ class ImplicitCustomWrapper(ImplicitWrapperBase):
             self.input_vals[input_name] = self.input_vals[input_name].reshape(self.inputs[input_name]['shape'])
 
         for output_name in self.state_vals:
+            # print(output_name, self.state_vals[output_name])
             self.state_vals[output_name] = self.state_vals[output_name].reshape(self.states[output_name]['shape'])
 
         residuals = {}

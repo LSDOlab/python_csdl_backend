@@ -122,13 +122,27 @@ class ImplicitLite(OperationBase):
             in_argument = in_argument.rstrip(in_argument[-1])
             in_argument = in_argument.rstrip(in_argument[-1])
 
+        initial_guesses_arg = ''
+        for i, state_name in enumerate(self.solver.states):
+            state_guess = self.to_initial_guess_name(state_name)
+            initial_guesses_arg += state_guess+', '
+        if initial_guesses_arg != '':
+            initial_guesses_arg = initial_guesses_arg.rstrip(initial_guesses_arg[-1])
+            initial_guesses_arg = initial_guesses_arg.rstrip(initial_guesses_arg[-1])
+
         # solved_outputs = newton_op(inputs)
+        eval_block.write(f'{self.operation_name}.set_guess({initial_guesses_arg})')
         eval_block.write(f'{self.operation_name}_out = {self.operation_name}.solve({in_argument})')
+        eval_block.write(f'initial_guesses = {self.operation_name}.get_guess()')
 
         for i, outv in enumerate(self.ordered_out_names):
 
             outv_id = self.get_output_id(outv)
             eval_block.write(f'{outv_id} = {self.operation_name}_out[{i}]')
+
+        for i, state_name in enumerate(self.solver.states):
+            state_guess = self.to_initial_guess_name(state_name)
+            eval_block.write(f'{state_guess} = initial_guesses[{i}]')
 
     def get_accumulation_function(self, input_paths, path_output, partials_block, vars):
         # Here we generate code to continue jacobian accumulation given accumulated paths from output to this implicit operation
@@ -149,6 +163,13 @@ class ImplicitLite(OperationBase):
         # Input paths must be in correct order...
         for i, path in enumerate(input_paths):
             partials_block.write(f'{path} = {self.operation_name}_path_in[{i}]')
+
+    def set_initial_state_guess(self, state_dict):
+        for state_name in self.solver.states:
+            state_dict[self.to_initial_guess_name(state_name)] = self.solver.states[state_name]['initial_val']
+
+    def to_initial_guess_name(self, name):
+        return f'initial_guess_{self.get_output_id(name)}'
 
 
 class NewtonLite(ImplicitLite):
@@ -201,6 +222,7 @@ class NonlinearBlockGSLite(ImplicitLite):
 #             self.ordered_in_names,
 #             self.ordered_out_names,
 #         )
+
 
 class SolveResLite(ImplicitLite):
 

@@ -41,6 +41,9 @@ class ImplicitSolverBase():
         self.exposed = self.function_wrapper.exposed
         self.needs_partials = True
 
+        # for state_name in self.states:
+        #     self.function_wrapper.set_state(state_name, self.states[state_name]['initial_val'])
+
     def solve(self, *inputs):
         """
         given input vals in the order of self.ordered_inputs, 
@@ -61,8 +64,8 @@ class ImplicitSolverBase():
                 self.brackets_map[state_bracket_name] = (self.brackets_map[state_bracket_name][0], inputs[i+j+1])
 
         # Set initial guess:
-        for state_name in self.states:
-            self.function_wrapper.set_state(state_name, self.states[state_name]['initial_val'])
+        # for state_name in self.states:
+        #     self.function_wrapper.set_state(state_name, self.states[state_name]['initial_val'])
 
         # All the initial values are now set. Solve residuals.
         self._solve_implicit()  # method used by subclass
@@ -72,6 +75,11 @@ class ImplicitSolverBase():
         return_tuple = []
         for output in self.ordered_outs:
             return_tuple.append(self.function_wrapper.get_state(output))
+            # print(output, self.function_wrapper.get_state(output))
+
+        # for state_name in self.states:
+        #     self.states[state_name]['initial_val'] = self.function_wrapper.get_state(state_name)
+
         return_tuple = tuple(return_tuple)
         return return_tuple
 
@@ -254,3 +262,16 @@ class ImplicitSolverBase():
                 accumulated_paths_rev[state_name][row_ind, :] = solved_rev[state_name].flatten()
 
         return accumulated_paths_rev
+
+    def set_guess(self, *guesses):
+        for i, state_name in enumerate(self.states):
+            # print(state_name, guesses[i].reshape(self.states[state_name]['shape']))
+            self.function_wrapper.set_state(state_name, guesses[i].reshape(self.states[state_name]['shape']))
+
+    def get_guess(self):
+
+        return_tuple = []
+        for state_name in self.states:
+            return_tuple.append(self.function_wrapper.get_state(state_name).reshape(self.states[state_name]['shape']))
+
+        return tuple(return_tuple)

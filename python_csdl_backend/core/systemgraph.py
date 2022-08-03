@@ -192,6 +192,12 @@ class SystemGraph(object):
 
             # write to filename a summary of each node
             with open(filename, 'a') as f:
+
+                if isinstance(node, OperationNode):
+                    continue
+                if node.promoted_id not in self.promoted_to_unique:
+                    continue
+
                 if isinstance(node, OperationNode):
                     f.write(f'\n{node.name}, {node.op}\n')
                 else:
@@ -336,10 +342,12 @@ class SystemGraph(object):
                     back_operation = get_backend_op(csdl_node)(csdl_node, nx_inputs, nx_outputs, node.name)
                 elif isinstance(csdl_node, (ImplicitOperation, BracketedSearchOperation)):
                     back_operation = get_backend_implicit_op(csdl_node)(csdl_node, nx_inputs, nx_outputs, node.name)
+                    back_operation.set_initial_state_guess(state_vals)
                 elif isinstance(csdl_node, CustomExplicitOperation):
                     back_operation = get_backend_custom_explicit_op(csdl_node)(csdl_node, nx_inputs, nx_outputs, node.name)
                 elif isinstance(csdl_node, CustomImplicitOperation):
                     back_operation = get_backend_custom_implicit_op(csdl_node)(csdl_node, nx_inputs, nx_outputs, node.name)
+                    back_operation.set_initial_state_guess(state_vals)
                 else:
                     raise NotImplementedError(f'{csdl_nodes} operation not found')
                 node.back_operation = back_operation

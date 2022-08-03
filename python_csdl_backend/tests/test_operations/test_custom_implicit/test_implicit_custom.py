@@ -27,7 +27,7 @@ class CustomImp(csdl.CustomImplicitOperation):
 
         nlsolver = self.parameters['nlsolver']
         if self.parameters['nlsolver'] == 'nlbgs':
-            self.nonlinear_solver = csdl.NonlinearBlockGS(maxiter = 100)
+            self.nonlinear_solver = csdl.NonlinearBlockGS(maxiter=100)
         elif self.parameters['nlsolver'] == 'newton':
             pass
         else:
@@ -95,32 +95,34 @@ def test_implicit_custom_newton():
         'f': np.array([2.38742589]),
         'x': np.array([0.38742589, 1.]),
         'y': np.array([2.]),
-        }
+    }
     totals_dict = {}
     run_test(
-        Implicit(nlsolver='newton'), 
-        outs = ['f', 'x', 'y'], 
-        ins = ['a', 'b', 'c'],
+        Implicit(nlsolver='newton'),
+        outs=['f', 'x', 'y'],
+        ins=['a', 'b', 'c'],
         name='test_implicit_custom_newton',
         vals_dict=vals_dict,
         totals_dict=totals_dict,
-        )
+    )
+
 
 def test_implicit_custom_nlbgs():
     vals_dict = {
         'f': np.array([2.38742589]),
         'x': np.array([0.38742589, 1.]),
         'y': np.array([2.]),
-        }
+    }
     totals_dict = {}
     run_test(
-        Implicit(nlsolver='nlbgs'), 
-        outs = ['f', 'x', 'y'], 
-        ins = ['a', 'b', 'c'],
+        Implicit(nlsolver='nlbgs'),
+        outs=['f', 'x', 'y'],
+        ins=['a', 'b', 'c'],
         name='test_implicit_custom_nlbgs',
         vals_dict=vals_dict,
         totals_dict=totals_dict,
-        )
+    )
+
 
 if __name__ == '__main__':
 
@@ -131,7 +133,13 @@ if __name__ == '__main__':
         # rep.visualize_graph()
         # exit()
 
-        sim = python_csdl_backend.Simulator(Implicit(nlsolver='newton'))
+        sim = python_csdl_backend.Simulator(Implicit(nlsolver='nlbgs'))
+        sim.run()
+        sim.run()
+        sim.run()
+
+        # sim.check_partials()
+        sim.check_totals(of='x', wrt='a', compact_print=False)
         sim.eval_instructions.script.save()
     else:
         import csdl_om
