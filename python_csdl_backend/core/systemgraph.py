@@ -194,10 +194,10 @@ class SystemGraph(object):
             # write to filename a summary of each node
             with open(filename, 'a') as f:
 
-                if isinstance(node, OperationNode):
-                    continue
-                if node.promoted_id not in self.promoted_to_unique:
-                    continue
+                # if isinstance(node, OperationNode):
+                #     continue
+                # if node.promoted_id not in self.promoted_to_unique:
+                #     continue
 
                 if isinstance(node, OperationNode):
                     f.write(f'\n{node.name}, {node.op}\n')
