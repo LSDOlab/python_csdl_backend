@@ -282,20 +282,11 @@ class Simulator(SimulatorBase):
         self.derivative_instructions_map[hash_key]['precomputed_vars'] = vars
         self.derivative_instructions_map[hash_key]['executable'] = exec
 
-    def compute_totals(self, of, wrt, return_format='[(of, wrt)]'):
-        '''
-        compute the derivatives of 'of' with respect to 'wrt'.
-
-        Parameters:
-        -----------
-            of: list or str
-                name(s) of outputs to take derivatives of.
-            wrt: list or str
-                name(s) of inputs to take derivatives wrt.
-            return_format: str
-                (EXPERIMENTAL) what format to return derivative in.
-        '''
-
+    def get_totals_key(self, of, wrt):
+        """
+        given of, wrt, for derivatives checks to see if execution script exists. If not, create one.
+        If so, return the derivative key.
+        """
         # make sure simulat has been ran once
         if self.ran_bool == False:
             raise ValueError('Simulator must be ran before computing derivatives.')
@@ -314,6 +305,13 @@ class Simulator(SimulatorBase):
             print(hash_key, ' not found, generating...')
             self._generate_totals(ofs, wrts)
 
+        return hash_key, ofs, wrts
+
+    def _compute_totals(self, hash_key, ofs, wrts, return_format):
+        """
+        executes the derivative evaluation codeobject of hash_key. should be only
+        be used by compute_totals
+        """
         # Execute script
         vars = self.derivative_instructions_map[hash_key]['precomputed_vars']
         adj_exec = self.derivative_instructions_map[hash_key]['executable']
@@ -335,8 +333,30 @@ class Simulator(SimulatorBase):
                         if of_name not in return_dict:
                             return_dict[of_name] = {}
                         return_dict[of_name][wrt_name] = current_derivative
-
         return return_dict
+
+    def compute_totals(
+        self,
+        of,
+        wrt,
+        return_format='[(of, wrt)]',
+    ):
+        '''
+        compute the derivatives of 'of' with respect to 'wrt'.
+
+        Parameters:
+        -----------
+            of: list or str
+                name(s) of outputs to take derivatives of.
+            wrt: list or str
+                name(s) of inputs to take derivatives wrt.
+            return_format: str
+                (EXPERIMENTAL) what format to return derivative in.
+        '''
+
+        hash_key, ofs, wrts = self.get_totals_key(of, wrt)
+
+        return self._compute_totals(hash_key, ofs, wrts, return_format)
 
     def visualize_implementation(self, depth=False):
         # TODO: TEMPORARY VISUALIZATION:
@@ -471,7 +491,12 @@ class Simulator(SimulatorBase):
             if not self._find_unique_id(var):
                 raise KeyError(f'cannot find variable \'{var}\'')
 
-    def check_totals(self, of=None, wrt=None, compact_print=True, step=1e-6):
+    def check_totals(
+            self,
+            of=None,
+            wrt=None,
+            compact_print=True,
+            step=1e-6):
         """
             checks total derivatives using finite difference.
 
@@ -767,20 +792,21 @@ class Simulator(SimulatorBase):
 
             self.state_vals[dv_id] = new_val.reshape(shape)
 
-    def compute_total_derivatives(self):
+    def compute_total_derivatives(self, check_failure=False):
         """
         computes derivatives of objective/constraints wrt design variables.
         """
 
-        # return error if not optimization problem
-        self.check_if_optimization(self.opt_bool)
+        hash_key, ofs, wrts = self.get_totals_key(self.output_keys, self.dv_keys)
 
-        self.optimization_derivatives = self.compute_totals(
-            of=self.output_keys,
-            wrt=self.dv_keys,
-        )
-
-        return self.optimization_derivatives
+        if check_failure:
+            try:
+                self.optimization_derivatives = self._compute_totals(hash_key, ofs, wrts, '[(of, wrt)]')
+                return False
+            except:
+                return True
+        else:
+            self.optimization_derivatives = self._compute_totals(hash_key, ofs, wrts, '[(of, wrt)]')
 
     def objective(self):
         """
