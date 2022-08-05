@@ -175,6 +175,9 @@ class Simulator(SimulatorBase):
             adj_name += f'{input_name},'
         adj_name = adj_name.rstrip(adj_name[-1])
 
+        if len(adj_name) > 250:
+            adj_name = adj_name[:250]
+
         # initialize adjoint derivatives instructions to write to
         # This script will be ran every
         adj_instructions = Instructions(adj_name)
@@ -954,9 +957,9 @@ class Simulator(SimulatorBase):
         save_dict = {}
         for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
             self.check_variable_existence(var_name)
-            save_dict[var_name] = self.state_vals[self._find_unique_id(var_name)]
+            # save_dict[var_name] = self.state_vals[self._find_unique_id(var_name)]
 
-        self.recorder.record(save_dict, 'simulator')
+        # self.recorder.record(save_dict, 'simulator')
 
     def check_if_optimization(self, opt_bool):
         """

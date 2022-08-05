@@ -39,6 +39,17 @@ def test_check_partials():
     np.testing.assert_almost_equal(len(t), 4)
 
 
+def test_opt_totals():
+    m = SampleModel()
+    sim = Simulator(m)
+
+    sim.run()
+    sim.compute_total_derivatives()
+
+    np.testing.assert_almost_equal(sim.objective_gradient(), 1.0)
+    np.testing.assert_almost_equal(sim.constraint_jacobian(), 1.0)
+
+
 # def test_check_totals():
 #     m = SampleModel()
 #     sim = Simulator(m)

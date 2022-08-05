@@ -3,6 +3,7 @@ from python_csdl_backend.core.codeblock import CodeBlock
 from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
+from python_csdl_backend.utils.sparse_utils import get_sparsity, SPARSITY_CUTOFF
 import numpy as np
 
 
@@ -82,4 +83,11 @@ class MatmatLite(OperationBase):
                 partials_block.write(f'{partial_name}[{row_name}, {col_name}] = vals')
 
     def determine_sparse(self):
+        # if self.input_size < 100:
+        #     return False
+
+        # if get_sparsity(max(len(self.r0), len(self.r1)), self.out_size, self.input_size) < SPARSITY_CUTOFF:
+        #     return True
+        # return False
+
         return self.determine_sparse_default_elementwise(self.input_size)
