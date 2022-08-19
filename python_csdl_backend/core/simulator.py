@@ -954,7 +954,7 @@ class Simulator(SimulatorBase):
         """
         self.recorder = recorder
 
-        save_dict = {}
+        # save_dict = {}
         for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
             self.check_variable_existence(var_name)
             # save_dict[var_name] = self.state_vals[self._find_unique_id(var_name)]

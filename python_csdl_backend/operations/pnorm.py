@@ -40,6 +40,7 @@ class VectorizedPNormLite(OperationBase):
         input = key_tuple[1].id
         output = key_tuple[0].id
         partial_name = partials_dict[key_tuple]['name']
+        partials_block.write(f'{output} = np.linalg.norm({input}.flatten(), ord={self.pnorm_type})')
         if is_sparse_jac:
             partials_block.write(f'{partial_name} = sp.csc_matrix(np.array([{output}**({1-self.pnorm_type})*({input}**({self.pnorm_type-1})).flatten()]))')
         else:
@@ -109,6 +110,7 @@ class VectorizedAxisWisePNormLite(OperationBase):
         vars[row_name] = self.rows
         vars[col_name] = self.cols
 
+        partials_block.write(f'{output} = np.sum({input}**{self.pnorm_type},axis={self.axis})**(1 / {self.pnorm_type})')
         if is_sparse_jac:
             # csc_matrix((data, (row_ind, col_ind)), [shape=(M, N)])
             partials_block.write(f'temp = np.einsum(\'{self.operation}\', {output}**(1 - {self.pnorm_type}), {input}**({self.pnorm_type} - 1)).flatten()')

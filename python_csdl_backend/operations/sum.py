@@ -52,6 +52,8 @@ class SingleTensorSumCompLite(OperationBase):
         else:
             vars[partial_name] = np.ones((1, self.input_size))
 
+    def determine_sparse(self):
+        return self.determine_sparse_default_elementwise(self.input_size)
 
 class MultipleTensorSumCompLite(OperationBase):
 
@@ -89,6 +91,8 @@ class MultipleTensorSumCompLite(OperationBase):
             else:
                 vars[partial_name] = np.ones((self.input_size,))
 
+    def determine_sparse(self):
+        return self.determine_sparse_default_elementwise(self.input_size)
 
 class SingleTensorSumCompAxisLite(OperationBase):
 
@@ -137,6 +141,8 @@ class SingleTensorSumCompAxisLite(OperationBase):
         else:
             vars[partial_name] = sp.csc_matrix((self.val, (rows, cols)), shape=(self.output_size, self.input_size))
 
+    def determine_sparse(self):
+        return self.determine_sparse_default_elementwise(self.input_size)
 
 class MultipleTensorSumCompAxisLite(OperationBase):
 
@@ -193,3 +199,6 @@ class MultipleTensorSumCompAxisLite(OperationBase):
         if get_sparsity(len(self.val), self.out_size, self.input_size) < SPARSE_SIZE_CUTOFF:
             return True
         return False
+
+    def determine_sparse(self):
+        return self.determine_sparse_default_elementwise(self.input_size)
