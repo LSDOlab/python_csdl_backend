@@ -48,8 +48,8 @@ class SystemGraph(object):
         self.constraints = constraints
         self.opt_bool = opt_bool
         self.num_ops = 0
-        self.all_implicit_operations = set() # set of all implicit operations
-        self.all_state_ids_to_guess = {} # maps state ids to the names of the initial guess
+        self.all_implicit_operations = set()  # set of all implicit operations
+        self.all_state_ids_to_guess = {}  # maps state ids to the names of the initial guess
 
         self.process_rep()
 

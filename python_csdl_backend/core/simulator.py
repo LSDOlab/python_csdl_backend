@@ -329,6 +329,9 @@ class Simulator(SimulatorBase):
                 var_local_name = get_deriv_name(of_id, wrt_id, partials=False)
                 current_derivative = totals_dict[var_local_name]
 
+                if isinstance(current_derivative, np.matrix):
+                    current_derivative = np.asarray(current_derivative)
+
                 if var_local_name in totals_dict:
                     if return_format == '[(of, wrt)]':
                         return_dict[(of_name, wrt_name)] = current_derivative
