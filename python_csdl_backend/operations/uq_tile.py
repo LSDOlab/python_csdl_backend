@@ -33,7 +33,7 @@ class UqTileLite(OperationBase):
         in_shape = self.in_shape
         out_shape = self.out_shape
         einsum_string = self.einsum_string
-        k = out_shape[0]
+        k = int(out_shape[0]/in_shape[0])
 
         # # outputs[out_name] = np.tile(inputs[in_name], tileshape)
         # k = in_shape[0]
