@@ -26,6 +26,7 @@ class ImplicitCustomWrapper(ImplicitWrapperBase):
         self.inputs = {}
         for input_name in self.ordered_inputs:
             self.inputs[input_name] = op.input_meta[input_name]
+            self.inputs[input_name]['size'] = np.prod(self.inputs[input_name]['shape'])
 
         self.states = {}
         self.total_state_size = 0
@@ -87,8 +88,11 @@ class ImplicitCustomWrapper(ImplicitWrapperBase):
         # 1) if CJVP and AIJ    -->     pure matrix-free method
         # 2.a) if CJVP and CD   -->     manual residual/state jac inverse/solve
         # 2.b) if AIJ and CD    -->     manual residual/input jac matmat
-        # 3) if CD only         -->     pure matrix method
-        # 4) if none of ^       -->     not enough information to solve.
+        # 3.a) if CD only       -->     pure matrix method
+        # 3.b) if CJVP only     -->     manual residual/state jac inverse/solve but pure matrix-free for residual/input jac
+        # 5) if none of ^       -->     not enough information to solve.
+        # 3a more efficient than 3b?
+
         if self.CJVP_given and self.AIJ_given:
             self.res_inverse_type = 'AIJ'
             self.res_input_type = 'CJVP'
@@ -101,8 +105,15 @@ class ImplicitCustomWrapper(ImplicitWrapperBase):
         elif self.CD_given:
             self.res_inverse_type = 'CD'
             self.res_input_type = 'CD'
+        elif self.CJVP_given:
+            self.res_inverse_type = 'CJVP'
+            self.res_input_type = 'CJVP'
         else:
             raise NotImplementedError(f'Not enough methods given to compute derivatives of custom implicit operation {op}')
+
+        # raise not implemented error
+        if self.res_inverse_type == 'CJVP':
+            raise NotImplementedError(f'jacvec product for residual state jac not yet implemented.')
 
     def prepare_evaluate_residuals(self):
 
@@ -140,6 +151,9 @@ class ImplicitCustomWrapper(ImplicitWrapperBase):
 
     def set_input(self, input_name, val):
         self.input_vals[input_name] = val
+
+    def get_input_size(self, input_name):
+        return np.prod(self.input_vals[input_name].shape)
 
     def set_state(self, state_name, val):
         self.state_vals[state_name] = val
@@ -193,3 +207,9 @@ class ImplicitCustomWrapper(ImplicitWrapperBase):
             'rev',
         )
         return applied_inverse_jacT
+
+    def compute_rev_jvp(self, d_r, d_in, d_o):
+        inputs = self.input_vals.copy()
+        outputs = self.state_vals.copy()
+        self.op.compute_jacvec_product(inputs, outputs, d_in, d_o, d_r, 'rev')
+        return d_in, d_o

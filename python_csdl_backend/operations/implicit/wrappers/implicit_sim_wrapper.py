@@ -74,6 +74,13 @@ class ImplicitSimWrapper(ImplicitWrapperBase):
         self.ordered_inputs = ins
         self.ordered_outs = outs
 
+        # dictionary of information on inputs
+        self.inputs = {}
+        for input in self.ordered_inputs:
+            self.inputs[input] = {}
+            self.inputs[input]['shape'] = self.sim[input].shape
+            self.inputs[input]['size'] = np.prod(self.inputs[input]['shape'])
+            
         # list of what to compute derivatives of
         self.of_list = list(self.residuals.keys()) + list(self.exposed.keys())
         self.wrt_list = list(self.states.keys()) + self.ordered_inputs

@@ -27,18 +27,27 @@ class ImplicitSolverBase():
 
             if self.function_wrapper.res_inverse_type == 'AIJ':
                 self.full_residual_jac = False
+            elif self.function_wrapper.res_inverse_type == 'CJVP':
+                self.full_residual_jac = False
             else:
                 self.full_residual_jac = True
+
+            if self.function_wrapper.res_input_type == 'CJVP':
+                self.full_input_jac = False
+            else:
+                self.full_input_jac = True
 
         else:
             self.function_wrapper = ImplicitSimWrapper(op, ins, outs)
             self.full_residual_jac = True
+            self.full_input_jac = True
 
         # attributes needed by solvers
         self.states = self.function_wrapper.states
         self.total_state_size = self.function_wrapper.total_state_size
         self.residuals = self.function_wrapper.residuals
         self.exposed = self.function_wrapper.exposed
+        self.inputs = self.function_wrapper.inputs
         self.needs_partials = True
 
         # for state_name in self.states:
@@ -164,32 +173,71 @@ class ImplicitSolverBase():
 
         # return tuple of outputs in order of ordered_inputs
         accumulated_paths = []
-        for input in self.ordered_inputs:
-            for i, state in enumerate(self.states):
-                res_name = self.states[state]['residual']
+        if self.full_input_jac:
+            for input in self.ordered_inputs:
+                for i, state in enumerate(self.states):
+                    res_name = self.states[state]['residual']
 
-                if i == 0:
-                    # print(res_name, input, self.totals[(res_name, input)].shape, x[state].shape)
+                    if i == 0:
+                        # print(res_name, input, self.totals[(res_name, input)].shape, x[state].shape)
 
-                    jac = x[state]@self.totals[(res_name, input)]
-                    # print(res_name, input, jac.shape, x[state].shape, self.totals[(res_name, input)].shape)
+                        jac = x[state]@self.totals[(res_name, input)]
+                        # print(res_name, input, jac.shape, x[state].shape, self.totals[(res_name, input)].shape)
 
-                else:
-                    # print(res_name, input, jac.shape, x[state].shape, self.totals[(res_name, input)].shape)
-                    jac += x[state]@self.totals[(res_name, input)]
+                    else:
+                        # print(res_name, input, jac.shape, x[state].shape, self.totals[(res_name, input)].shape)
+                        jac += x[state]@self.totals[(res_name, input)]
 
-            # adjoint has negative
-            jac = jac*-1
+                # adjoint has negative
+                jac = jac*-1
 
-            for exposed_ind, exposed in enumerate(self.ordered_outs):
-                # If the output is exposed, chain rule the output to the input:
-                # py/pa = py/pe1 * pe1/pa + py/pe2* pe2/pa + ... + c_xa
-                # c_xa is computed before this
-                if exposed in self.exposed:
-                    # TODO: if we know totals(exposed, input) is zero, we can skip this part
-                    jac += output_paths[exposed_ind] @ self.totals[(exposed, input)]
+                for exposed_ind, exposed in enumerate(self.ordered_outs):
+                    # If the output is exposed, chain rule the output to the input:
+                    # py/pa = py/pe1 * pe1/pa + py/pe2* pe2/pa + ... + c_xa
+                    # c_xa is computed before this
+                    if exposed in self.exposed:
+                        # TODO: if we know totals(exposed, input) is zero, we can skip this part
+                        jac += output_paths[exposed_ind] @ self.totals[(exposed, input)]
 
-            accumulated_paths.append(jac)
+                accumulated_paths.append(jac)
+
+        else:
+            # Initialize inputs path that will be populated by JVP
+            num_rows = x[list(x.keys())[0]].shape[0]
+            for input_name in self.ordered_inputs:
+                jac = np.zeros((num_rows, self.inputs[input_name]['size']))
+                accumulated_paths.append(jac)
+
+            # call compute_jacvec_product for each row of output adjoint
+            d_r = {}
+            d_in = {}
+            d_o = {}
+            for row in range(num_rows):
+                # set d_r
+                # set d_o (should not be used)
+                for res_name in self.residuals:
+                    state_name = self.residuals[res_name]['state']
+                    shape = self.states[state_name]['shape']
+                    # print(x[state_name][row, :].shape)
+                    if isinstance(x[state_name], np.ndarray):
+                        d_r[res_name] = (x[state_name][row, :]).reshape(shape)
+                    else:
+                        d_r[res_name] = (x[state_name][row, :].toarray()).reshape(shape)
+                    # d_o[state_name] = np.zeros(shape)
+
+                # set d_in
+                for input_name in self.ordered_inputs:
+                    d_in[input_name] = np.zeros(self.inputs[input_name]['shape'])
+
+                # call compute_jacvec
+                din, _ = self.function_wrapper.compute_rev_jvp(d_r, d_in, d_o)
+
+                # fill input path jac for current row
+                for i, input_name in enumerate(self.ordered_inputs):
+                    accumulated_paths[i][row,:] = din[input_name].flatten()
+
+            for i in range(len(accumulated_paths)):
+                accumulated_paths[i] = -accumulated_paths[i]
 
         # paths are now solved
         accumulated_paths = tuple(accumulated_paths)
@@ -229,7 +277,7 @@ class ImplicitSolverBase():
     def solve_res_system_rev_apply(self, b):
         """
         apply inverse jacobian. calls custom implicit operation's apply inverse jacobian.
-        should never be called for ImplicitOperations.
+        should never be called for non-custom ImplicitOperations.
         """
 
         accumulated_paths_rev = {}

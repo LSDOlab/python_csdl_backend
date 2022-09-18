@@ -39,8 +39,8 @@ class Example(CustomExplicitOperation):
 
         d_in = x.dot(A)
 
-        d_inputs['a'] = d_in[0:2]
-        d_inputs['b'] = d_in[2:]
+        d_inputs['a'] += d_in[0:2]
+        d_inputs['b'] += d_in[2:]
 
 
 class ExplicitRunJVPLarge(csdl.Model):
@@ -77,10 +77,12 @@ if __name__ == '__main__':
     # sim = csdl_om.Simulator(ExplicitRun())
 
     import python_csdl_backend
-    sim = python_csdl_backend.Simulator(ExplicitRun())
+    sim = python_csdl_backend.Simulator(ExplicitRunJVPLarge())
     sim.eval_instructions.save()
     sim.run()
 
     print(sim['x'])
     print(sim['y'])
     print(sim['f'])
+
+    sim.check_partials()

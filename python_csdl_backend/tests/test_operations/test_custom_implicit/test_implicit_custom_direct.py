@@ -1,4 +1,5 @@
 from python_csdl_backend.tests.create_single_test import run_test
+from python_csdl_backend.tests.test_operations.test_custom_implicit.custom_implicit_solutions import fwd_assertion, deriv_assertion
 import csdl
 import numpy as np
 
@@ -100,16 +101,16 @@ class Implicit(csdl.Model):
 
 
 def test_implicit_newton():
-    vals_dict = {}
-    totals_dict = {}
+    vals_dict = fwd_assertion
+    totals_dict = deriv_assertion
 
     run_test(
-        Implicit(nlsolver='newton'), 
-        outs = ['f', 'x', 'y'], 
-        ins = ['a', 'b', 'c'],
+        Implicit(nlsolver='newton'),
+        outs=['f', 'x', 'y'],
+        ins=['a', 'b', 'c'],
         vals_dict=vals_dict,
         totals_dict=totals_dict,
-        )
+    )
 
 
 if __name__ == '__main__':

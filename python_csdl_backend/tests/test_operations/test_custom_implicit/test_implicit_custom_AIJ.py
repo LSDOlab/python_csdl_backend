@@ -1,4 +1,5 @@
 from python_csdl_backend.tests.create_single_test import run_test
+from python_csdl_backend.tests.test_operations.test_custom_implicit.custom_implicit_solutions import fwd_assertion, deriv_assertion
 import csdl
 import numpy as np
 
@@ -24,6 +25,14 @@ class CustomImp(csdl.CustomImplicitOperation):
         self.declare_derivatives('x', 'y')
 
         self.declare_derivatives('y', 'y', rows=[0], cols=[0], val=[1.0])
+
+        nlsolver = self.parameters['nlsolver']
+        if self.parameters['nlsolver'] == 'nlbgs':
+            self.nonlinear_solver = csdl.NonlinearBlockGS(maxiter=100)
+        elif self.parameters['nlsolver'] == 'newton':
+            pass
+        else:
+            raise ValueError(f'solver {nlsolver} not found')
 
     def evaluate_residuals(self, inputs, outputs, residuals):
 
@@ -94,10 +103,22 @@ class Implicit(csdl.Model):
 
 
 def test_implicit_newton_aij():
-    vals_dict = {}
-    totals_dict = {}
+    vals_dict = fwd_assertion
+    totals_dict = deriv_assertion
     run_test(
         Implicit(nlsolver='newton'),
+        outs=['f', 'x', 'y'],
+        ins=['a', 'b', 'c'],
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+    )
+
+
+def test_implicit_nlbgs_aij():
+    vals_dict = fwd_assertion
+    totals_dict = deriv_assertion
+    run_test(
+        Implicit(nlsolver='nlbgs'),
         outs=['f', 'x', 'y'],
         ins=['a', 'b', 'c'],
         vals_dict=vals_dict,
