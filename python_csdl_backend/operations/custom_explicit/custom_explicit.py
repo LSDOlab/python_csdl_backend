@@ -163,7 +163,11 @@ class CustomExplicitWrapper():
         # process outputs
         output_tuple = []
         for i, output_name in enumerate(self.ordered_out_names):
-            output_tuple.append(outputs[output_name])
+
+            if isinstance(outputs[output_name], np.ndarray):
+                output_tuple.append(outputs[output_name])
+            else:
+                output_tuple.append(np.array(outputs[output_name]))
         output_tuple = tuple(output_tuple)
 
         # return tuple of numpy arrays
