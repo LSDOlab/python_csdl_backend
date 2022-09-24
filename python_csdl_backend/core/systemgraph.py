@@ -121,6 +121,8 @@ class SystemGraph(object):
 
                     for unpromoted_id in unpromoted_id_set:
                         self.unpromoted_to_unique[unpromoted_id] = unique_id
+                else:
+                    self.promoted_to_unique[promoted_id] = unique_id
 
                 # add all declared target names in mappings
                 # if node.name == 'geometry_control_points':
@@ -303,7 +305,7 @@ class SystemGraph(object):
                 promoted_id = node.promoted_id
 
                 if isinstance(csdl_node, Output):
-                    if node.name[0] != '_':
+                    if (len(list(self.eval_graph.successors(node))) == 0) or (node.name[0] != '_'):
                         if promoted_id in self.promoted_to_unique:
                             variable_info['outputs'][promoted_id] = {}
                             variable_info['outputs'][promoted_id]['shape'] = csdl_node.shape
