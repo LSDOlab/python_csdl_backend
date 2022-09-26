@@ -12,6 +12,7 @@ import scipy.sparse as sp
 def get_expand_lite(op):
 
     if (op.dependencies[0].shape != (1, )):
+    # if len(op.dependencies[0].shape) != 1:
         return ExpandArrayLite
     else:
         return ExpandScalarLite
@@ -36,6 +37,7 @@ class ExpandArrayLite(OperationBase):
         self.out_shape = self.outvar.shape
         self.val = self.invar.val
         self.expand_indices = operation.literals['expand_indices']
+        print(self.expand_indices)
 
         # self.outname = get_only(self.nx_outputs_dict)
         # self.outvar = self.nx_outputs_dict[self.outname]

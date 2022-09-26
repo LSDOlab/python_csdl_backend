@@ -42,7 +42,7 @@ from csdl.operations.max import max
 # from csdl.operations.inner import inner
 # from csdl.operations.average import average
 from csdl.operations.min import min
-from csdl.operations.uq_tile import uq_tile
+# from csdl.operations.uq_tile import uq_tile
 
 from csdl import CustomExplicitOperation
 
@@ -92,7 +92,7 @@ from python_csdl_backend.operations.max import get_max_lite
 # from python_csdl_backend.operations.inner import get_inner_lite
 # from python_csdl_backend.operations.average import get_average_lite
 from python_csdl_backend.operations.min import get_min_lite
-from python_csdl_backend.operations.uq_tile import get_uqtile_lite
+# from python_csdl_backend.operations.uq_tile import get_uqtile_lite
 
 
 from python_csdl_backend.operations.implicit.implicit_operation import get_implicit_lite, get_implicit_custom_lite
@@ -141,9 +141,9 @@ csdl_to_back_map = {
     rotmat: get_rotmat_lite,
     outer: get_outer_lite,
     reorder_axes: get_reorder_axes_lite,
-    max : get_max_lite,
-    min : get_min_lite,
-    uq_tile: get_uqtile_lite,
+    max: get_max_lite,
+    min: get_min_lite,
+    # uq_tile: get_uqtile_lite,
     # inner : get_inner_lite,
     # average : get_average_lite,
 }

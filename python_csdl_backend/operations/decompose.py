@@ -39,6 +39,8 @@ class DecomposeLite(OperationBase):
             # eval_block.comment(f'in shape: {self.shape}, in name:{self.in_name}, out shape: {shape}')
             # eval_block.write(f'print(type({self.in_name}))')
             # eval_block.write(f'print({self.in_name}.flatten().shape)')
+            # eval_block.write(f'print({src_indices_name})')
+            # print(src_indices.shape)
             eval_block.write(f'{name_id} = (({self.in_name}.flatten())[{src_indices_name}]).reshape({shape})')
             # eval_block.write(f'{name_id} = {self.in_name}.flatten()[{src_indices_name}]')
             # eval_block.write(f'{name_id} = {name_id}.reshape({shape})')
