@@ -11,5 +11,5 @@ class SolveResCustom(ImplicitSolverBase):
         self.tol = 1e-10
 
     def _solve_implicit(self):
-
+        self.function_wrapper.run()
         self.function_wrapper.solve_residuals()
