@@ -61,7 +61,7 @@ class ImplicitSolverBase():
 
         # Set inputs to the implicit operation:
         for i, input_name in enumerate(self.ordered_inputs):
-            self.function_wrapper.set_input(input_name, inputs[i])
+            self.function_wrapper.set_input(input_name, inputs[i].copy())
 
         # rare case for implicit operation brackets:
         for j, bracket_name in enumerate(self.ordered_in_brackets):
@@ -81,7 +81,7 @@ class ImplicitSolverBase():
         # Set and return solved states and exposed variables
         return_tuple = []
         for output in self.ordered_outs:
-            return_tuple.append(self.function_wrapper.get_state(output))
+            return_tuple.append(self.function_wrapper.get_state(output).copy())
             # print(output, self.function_wrapper.get_state(output))
 
         return_tuple = tuple(return_tuple)

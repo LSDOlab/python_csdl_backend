@@ -671,6 +671,8 @@ class Simulator(SimulatorBase):
             for key in error_dict:
                 print(f'\n----------------------------------------------------')
                 rel_error = error_dict[key]['relative_error_norm']
+                if rel_error > 1e-5:
+                    print('WARNING: RELATIVE ERROR ABOVE BOUND')
                 abs_error = error_dict[key]['abs_error_norm']
                 print(f'{key}\t{rel_error}\t{abs_error}')
                 print('finite difference:')
