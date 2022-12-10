@@ -36,7 +36,7 @@ class CustomExplicitLite(OperationBase):
 
         # Object we are passing into the eval and reverse script
         self.explicit_wrapper = CustomExplicitWrapper(operation, self.ordered_in_names, self.ordered_out_names)
-        self.wrapper_func_name = f'{name}_func'
+        self.wrapper_func_name = f'{name}_func_{list(self.ordered_out_names.keys())[0]}'
 
         # True if compute_jacvec instead of compute_derivatives
         self.jac_is_function = self.explicit_wrapper.jac_is_function
@@ -59,7 +59,7 @@ class CustomExplicitLite(OperationBase):
         for i, output in enumerate(self.ordered_out_names):
 
             out_name = self.get_output_id(output)
-            eval_block.write(f'{out_name} = temp[{i}]')
+            eval_block.write(f'{out_name} = temp[{i}].copy()')
 
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
 
@@ -91,7 +91,7 @@ class CustomExplicitLite(OperationBase):
 
         # Input paths must be in correct order...
         for i, path in enumerate(input_paths):
-            partials_block.write(f'{path} = {self.operation_name}_path_in[{i}]')
+            partials_block.write(f'{path} = {self.operation_name}_path_in[{i}].copy()')
 
 
 class CustomExplicitWrapper():
@@ -148,13 +148,13 @@ class CustomExplicitWrapper():
         # set inputs and outputs. TODO: preprocess as much as we can
         self.inputs = {}
         for i, input_name in enumerate(self.ordered_in_names):
-            self.inputs[input_name] = input_vals[i].reshape(self.ordered_in_names[input_name]['shape'])
+            self.inputs[input_name] = (input_vals[i].copy()).reshape(self.ordered_in_names[input_name]['shape'])
         outputs = {}
         for i, output_name in enumerate(self.ordered_out_names):
             outputs[output_name] = np.zeros(self.ordered_out_names[output_name]['shape'])
 
         # run compute method
-        self.op.compute(self.inputs, outputs)
+        self.op.compute(self.inputs.copy(), outputs)
 
         # compute derivatives beforehand
         if not self.jac_is_function:
@@ -165,7 +165,7 @@ class CustomExplicitWrapper():
         for i, output_name in enumerate(self.ordered_out_names):
 
             if isinstance(outputs[output_name], np.ndarray):
-                output_tuple.append(outputs[output_name])
+                output_tuple.append(outputs[output_name].copy())
             else:
                 output_tuple.append(np.array(outputs[output_name]))
         output_tuple = tuple(output_tuple)

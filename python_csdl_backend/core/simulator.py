@@ -156,6 +156,12 @@ class Simulator(SimulatorBase):
         # if mode == 'rev':
         #     self.graph_reversed = self.eval_graph.reverse()
 
+        # # TODO: REMOVE!!!!!!!!!
+        # self.vec_num_f_calls = []
+        # self.vec_num_vectorized_f_calls = []
+        # self.vec_num_df_calls = []
+        # self.vec_num_vectorized_df_calls = []
+
     def _generate_adjoint(self, outputs, inputs):
         '''
         given a list of outputs and inputs, creates the script for the adjoint.
@@ -256,6 +262,20 @@ class Simulator(SimulatorBase):
         """
         Parameters:
         """
+
+        # # TODO: REMOVE!!!!!!!!!
+        # try:
+        #     self.rep.model_TEMP.ode_problem.integrator.ode_system.num_f_calls
+        #     self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_f_calls
+        #     self.rep.model_TEMP.ode_problem.integrator.ode_system.num_df_calls
+        #     self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_df_calls
+
+        #     self.vec_num_f_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_f_calls)
+        #     self.vec_num_vectorized_f_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_f_calls)
+        #     self.vec_num_df_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_df_calls)
+        #     self.vec_num_vectorized_df_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_df_calls)
+        # except:
+        #     pass
 
         if remember_implicit_states:
             self.remember_implicit_states()
@@ -805,6 +825,9 @@ class Simulator(SimulatorBase):
         computes derivatives of objective/constraints wrt design variables.
         """
 
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
+
         hash_key, ofs, wrts = self.get_totals_key(self.output_keys, self.dv_keys)
 
         if check_failure:
@@ -913,7 +936,7 @@ class Simulator(SimulatorBase):
                        abs_err_tol=1e-6,
                        rel_err_tol=1e-6,
                        method='fd',
-                       step=None,
+                       step=1e-6,
                        form='forward',
                        step_calc='abs',
                        force_dense=True,
@@ -938,6 +961,7 @@ class Simulator(SimulatorBase):
             of=all_of_names,
             wrt=all_wrt_names,
             compact_print=compact_print,
+            step=step,
         )
 
         return check_totals

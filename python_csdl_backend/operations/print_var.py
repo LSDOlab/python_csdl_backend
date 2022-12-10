@@ -28,9 +28,9 @@ class PrintVarLite(OperationBase):
         # self.output_name = self.get_output_id(self.out_name)
 
     def get_evaluation(self, eval_block, vars):
-        
+
         eval_block.write('print()')
-        eval_block.write(f'print(\'printing \', \'{self.input_name}\')')
+        eval_block.write(f'print(\'printing \', \'{self.input_name} ({self.in_name})\')')
         # eval_block.write(f'print(\'full name: \',\'{self.full_namespace}.{self.in_name}\')')
         eval_block.write(f'print({self.input_name})')
         eval_block.write(f'{self.out_name} = {self.input_name}')
@@ -48,7 +48,7 @@ class PrintVarLite(OperationBase):
         # else:
         #     vars[partial_name] = np.eye(self.input_size)
 
-        # NEW: 
+        # NEW:
         # only return diag values for elementwise
         # Also sparsity doesn't matter
         vars[partial_name] = np.ones(self.input_size)

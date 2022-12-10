@@ -262,10 +262,11 @@ class ScalarExtremumLite(OperationBase):
 
             dsum_dg = self.rho * exponents
             dKS_dsum = 1.0 / (self.rho * summation * np.ones(self.shape))
+            # print(dKS_dsum.shape, dsum_dg.shape)
             dKS_dg = (dKS_dsum * dsum_dg).reshape((self.outsize, self.insize))
             return dKS_dg
 
-        partials_name = self.name+'_partials'
+        partials_name = self.name+'_partials'+partial_name
 
         vars[partials_name] = compute_max_deriv
 
