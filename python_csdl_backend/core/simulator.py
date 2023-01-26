@@ -7,7 +7,7 @@ from python_csdl_backend.core.systemgraph import SystemGraph
 from python_csdl_backend.utils.general_utils import get_deriv_name, to_list, lineup_string, set_opt_upper_lower, set_scaler_array
 from python_csdl_backend.utils.custom_utils import check_not_implemented_args
 import warnings
-# import time
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -50,6 +50,8 @@ class Simulator(SimulatorBase):
                 files for debugging. These files are not used for computation.
 
         """
+        self.start_time = None
+        self.total_time = 0
         self.display_scripts = display_scripts
         self.recorder = None
         if not isinstance(root, bool):
@@ -263,26 +265,28 @@ class Simulator(SimulatorBase):
         Parameters:
         """
 
-        # # TODO: REMOVE!!!!!!!!!
-        # try:
-        #     self.rep.model_TEMP.ode_problem.integrator.ode_system.num_f_calls
-        #     self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_f_calls
-        #     self.rep.model_TEMP.ode_problem.integrator.ode_system.num_df_calls
-        #     self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_df_calls
+        # TODO: REMOVE!!!!!!!!!
+        try:
+            self.rep.model_TEMP.ode_problem.integrator.ode_system.num_f_calls
+            self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_f_calls
+            self.rep.model_TEMP.ode_problem.integrator.ode_system.num_df_calls
+            self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_df_calls
 
-        #     self.vec_num_f_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_f_calls)
-        #     self.vec_num_vectorized_f_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_f_calls)
-        #     self.vec_num_df_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_df_calls)
-        #     self.vec_num_vectorized_df_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_df_calls)
-        # except:
-        #     pass
+            self.vec_num_f_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_f_calls)
+            self.vec_num_vectorized_f_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_f_calls)
+            self.vec_num_df_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_df_calls)
+            self.vec_num_vectorized_df_calls.append(self.rep.model_TEMP.ode_problem.integrator.ode_system.num_vectorized_df_calls)
+        except:
+            pass
 
         if remember_implicit_states:
             self.remember_implicit_states()
             # print("remember")
 
+        self.start_timer()
         eval_vars = {**states, **self.preeval_vars}
         new_states = self.eval_instructions.execute(eval_vars)
+        self.total_time += self.get_time()
 
         return new_states
 
@@ -336,9 +340,11 @@ class Simulator(SimulatorBase):
         be used by compute_totals
         """
         # Execute script
+        self.start_timer()
         vars = self.derivative_instructions_map[hash_key]['precomputed_vars']
         adj_exec = self.derivative_instructions_map[hash_key]['executable']
         totals_dict = adj_exec.execute({**self.state_vals, **vars})
+        self.total_time += self.get_time()
 
         # Return computed totals
         return_dict = {}
@@ -1005,6 +1011,20 @@ class Simulator(SimulatorBase):
         for state_id, guess_id in self.system_graph.all_state_ids_to_guess.items():
             self.state_vals[guess_id] = self.state_vals[state_id]
 
+    def start_timer(self):
+        """
+        starts internal timer.
+        """
+        self.start_time = time.time()
+
+    def get_time(self):
+        """
+        returns time in seconds since "start_timer" was called. If it hasn't been called, returns None
+        """
+        if self.start_time is None:
+            return None
+        else:
+            return time.time() - self.start_time
     # def find_variables_between(self, source_name, target_name):
     #     """
     #     EXPERIMENTAL: lists all variables between source and target
