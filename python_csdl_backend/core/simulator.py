@@ -158,11 +158,11 @@ class Simulator(SimulatorBase):
         # if mode == 'rev':
         #     self.graph_reversed = self.eval_graph.reverse()
 
-        # # TODO: REMOVE!!!!!!!!!
-        # self.vec_num_f_calls = []
-        # self.vec_num_vectorized_f_calls = []
-        # self.vec_num_df_calls = []
-        # self.vec_num_vectorized_df_calls = []
+        # TODO: REMOVE!!!!!!!!!
+        self.vec_num_f_calls = []
+        self.vec_num_vectorized_f_calls = []
+        self.vec_num_df_calls = []
+        self.vec_num_vectorized_df_calls = []
 
     def _generate_adjoint(self, outputs, inputs):
         '''
@@ -825,6 +825,17 @@ class Simulator(SimulatorBase):
             dv_id = self._find_unique_id(dv_name)
 
             self.state_vals[dv_id] = new_val.reshape(shape)
+
+    def generate_total_derivatives(self):
+        """
+        generates derivatives of objective/constraints wrt design variables.
+        """
+        self.ran_bool = True
+        # return error if not optimization problem
+        self.check_if_optimization(self.opt_bool)
+
+        hash_key, ofs, wrts = self.get_totals_key(self.output_keys, self.dv_keys)
+        self.ran_bool = False
 
     def compute_total_derivatives(self, check_failure=False):
         """
