@@ -1,11 +1,10 @@
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='python_csdl_backend',
-    packages=[
-        'python_csdl_backend',
-    ],
+    packages=find_packages(),
+    #packages=['python_csdl_backend'],
     install_requires=[
         'networkx>=2.8.4',
         'csdl<1',
