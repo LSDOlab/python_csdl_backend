@@ -50,7 +50,8 @@ class SystemGraph(object):
         self.num_ops = 0
         self.all_implicit_operations = set()  # set of all implicit operations
         self.all_state_ids_to_guess = {}  # maps state ids to the names of the initial guess
-
+        self.all_state_ids_to_implicit_operations = {}  # maps state ids to the backend implicit operation
+ 
         self.process_rep()
 
         # rev or fwd
@@ -348,11 +349,17 @@ class SystemGraph(object):
                     back_operation.set_initial_state_guess(state_vals)
                     self.all_implicit_operations.add(back_operation)
                     self.all_state_ids_to_guess.update(back_operation.state_outid_to_initial_guess)
+
+                    for state_outid in back_operation.state_outid_to_initial_guess:
+                        self.all_state_ids_to_implicit_operations[state_outid] = back_operation
                 elif isinstance(csdl_node, CustomImplicitOperation):
                     back_operation = get_backend_custom_implicit_op(csdl_node)(csdl_node, nx_inputs, nx_outputs, node.name)
                     back_operation.set_initial_state_guess(state_vals)
                     self.all_implicit_operations.add(back_operation)
                     self.all_state_ids_to_guess.update(back_operation.state_outid_to_initial_guess)
+                    
+                    for state_outid in back_operation.state_outid_to_initial_guess:
+                        self.all_state_ids_to_implicit_operations[state_outid] = back_operation
                 else:
                     raise NotImplementedError(f'{csdl_nodes} operation not found')
                 node.back_operation = back_operation

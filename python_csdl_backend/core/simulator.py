@@ -81,6 +81,7 @@ class Simulator(SimulatorBase):
         self.dvs = self.rep.design_variables
         self.obj = self.rep.objective
         self.cvs = self.rep.constraints
+        self.dont_remember_initial = set()
 
         # if an objective is specified, this is an optimization problem
         if self.obj:
@@ -1003,8 +1004,23 @@ class Simulator(SimulatorBase):
         sets the initial guesses of all implicit operations as the current solved state
         """
         for state_id, guess_id in self.system_graph.all_state_ids_to_guess.items():
+            if state_id in self.dont_remember_initial:
+                continue
             self.state_vals[guess_id] = self.state_vals[state_id]
 
+    def set_implicit_guess_and_tol(self, state_name, initial_guess, tolerance):
+        """
+        set initial guess of state called "state_name"
+        """
+        state_id = self._find_unique_id(state_name)
+        self.dont_remember_initial.add(state_id)
+        guess_id = self.system_graph.all_state_ids_to_guess[state_id]
+        self.state_vals[guess_id] = initial_guess
+
+        # print(self.system_graph.all_state_ids_to_implicit_operations[state_id].solver.tol)
+        self.system_graph.all_state_ids_to_implicit_operations[state_id].solver.tol = tolerance
+        # print(self.system_graph.all_state_ids_to_implicit_operations[state_id].solver.tol)
+    
     # def find_variables_between(self, source_name, target_name):
     #     """
     #     EXPERIMENTAL: lists all variables between source and target
