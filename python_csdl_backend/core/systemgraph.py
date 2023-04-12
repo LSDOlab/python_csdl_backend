@@ -322,9 +322,31 @@ class SystemGraph(object):
                 # only write stuff for operations.
                 continue
 
-            csdl_node = node.op
+        for node in self.rep.schedule:
+
             all_op_classes = (StandardOperation, CustomExplicitOperation, ImplicitOperation, BracketedSearchOperation, CustomImplicitOperation)
-            if isinstance(csdl_node, all_op_classes):
+            if isinstance(node, str):
+                from dag_parallelizer.compiler.generator import generate_receive, generate_send
+                if 'WAIT' in node:
+                    continue
+
+                split_string = node.split("/")
+                # print(split_string, node)
+                var_id = split_string[1]
+                var_node = self.unique_to_node[var_id]
+                var_num = var_id.split("_")[0][1:]
+                var_num = int(var_num)
+                node_int = (var_id, var_num)
+                if 'SEND' in node:
+                    eval_block.write(generate_send(node, var_node.var.shape, node_int))
+                elif 'GET' in node:
+                    eval_block.write(generate_receive(node, var_node.var.shape, node_int))
+                else:
+                    raise ValueError('lkjsdfsndsfdslknfsdknfsdkjnfkjsdnfkjds')
+            # elif isinstance(node.op, all_op_classes):
+            elif isinstance(node, OperationNode):
+
+                csdl_node = node.op
 
                 # input to operation_lite object
                 # give successors and predecessors
@@ -354,7 +376,7 @@ class SystemGraph(object):
                     self.all_implicit_operations.add(back_operation)
                     self.all_state_ids_to_guess.update(back_operation.state_outid_to_initial_guess)
                 else:
-                    raise NotImplementedError(f'{csdl_nodes} operation not found')
+                    raise NotImplementedError(f'{csdl_node} operation not found')
                 node.back_operation = back_operation
 
                 # Get the evaluation procedure for current operation

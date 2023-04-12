@@ -23,7 +23,8 @@ class Simulator(SimulatorBase):
                  analytics=False,
                  sparsity='auto',
                  display_scripts=False,
-                 root=True):
+                 root=True,
+                 comm = None):
         """
         CSDL compiler backend. Evaluates model and derivatives.
 
@@ -113,6 +114,72 @@ class Simulator(SimulatorBase):
             constraints=self.cvs,
             opt_bool=self.opt_bool)
 
+        # =--=-==-=-=-=-=-=-=-=-=-=-=-=-PARALELIZATION=--=-==-=-=-=-=-=-=-=-=-=-=-=-
+        self.comm = comm
+        if comm:
+            from dag_parallelizer import create_csdl_like_graph, assign_costs, Scheduler, rep2parallelizable
+            from dag_parallelizer.schedulers import MTA, MTA_ETA, MTA_PT2PT_INSERTION
+            from dag_parallelizer.compiler.generator import code_generator
+            from dag_parallelizer.compiler.run_code import run_code 
+            ccl_graph, str2nodes = rep2parallelizable(
+                comm,
+                self.rep,
+            )
+            COMM_COST = 100
+            OP_COST = 1
+            # Operation settings:
+            VARIABLE_SIZE = 2000
+            COMM_COST = VARIABLE_SIZE/1000
+            # COMM_COST = 0
+            OP_COST = VARIABLE_SIZE/100
+
+            # Graph partitioning:
+            PARTITION_TYPE = MTA()
+            # PARTITION_TYPE = MTA_ETA()
+            # PARTITION_TYPE = MTA_PT2PT_INSERTION()
+
+            PROFILE = 0
+            MAKE_PLOTS = 0
+            # MAKE_PLOTS = 1
+            VISUALIZE_SCHEDULE = 0
+
+            assign_costs(
+                ccl_graph,
+                communication_cost = COMM_COST,
+                operation_cost = OP_COST,
+            )
+
+            # Create a schedule from a choice of algorithms
+            scheduler = Scheduler(PARTITION_TYPE, comm)
+            schedule = scheduler.schedule(
+                ccl_graph,
+                profile = PROFILE,
+                create_plots = MAKE_PLOTS,
+                visualize_schedule = VISUALIZE_SCHEDULE,
+            )
+
+            # print(str2nodes)
+            schedule_new = []
+            for node in schedule:
+                if ('SEND' in node) or ('GET' in node) or ('WAIT' in node):
+                    schedule_new.append(node)
+                else:
+                    schedule_new.append(str2nodes[node])
+
+            # for node in schedule_new:
+            #     print(node)
+
+            # print('rank ', comm.rank,  schedule_new)
+            # print('rank ', comm.rank)
+            # for n in schedule_new:
+            #     print(comm.rank, n)
+
+            self.rep.schedule = schedule_new
+        else:
+            self.rep.schedule = nx.topological_sort(self.rep.flat_graph)
+        # exit()
+        # =--=-==-=-=-=-=-=-=-=-=-=-=-=-PARALELIZATION=--=-==-=-=-=-=-=-=-=-=-=-=-=-
+
         # :::::ANALYTICS:::::
         if self.analytics:
             # loop through operations and stuff
@@ -134,7 +201,10 @@ class Simulator(SimulatorBase):
             self.process_optimization_vars()
 
         #  ----------- create model evaluation script -----------
-        self.eval_instructions = Instructions(f'RUN_MODEL')
+        if comm:
+            self.eval_instructions = Instructions(f'RUN_MODEL_{comm.rank}')
+        else:
+            self.eval_instructions = Instructions(f'RUN_MODEL')
 
         # This line basically creates the mode evaluation graph
         eval_block, self.preeval_vars, state_vals_extracted, variable_info = self.system_graph.generate_evaluation()
@@ -282,6 +352,8 @@ class Simulator(SimulatorBase):
             # print("remember")
 
         eval_vars = {**states, **self.preeval_vars}
+        if self.comm:
+            eval_vars['comm'] = self.comm
         new_states = self.eval_instructions.execute(eval_vars)
 
         return new_states
