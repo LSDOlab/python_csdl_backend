@@ -11,12 +11,11 @@ from python_csdl_backend.core.simulator import Simulator
 import string
 import time
 
-
 def propagate_uq(
     rep: GraphRepresentation,
     rvs: Dict[str, np.ndarray] = {},
-    method='NIPC',
-    output_name='a',
+    method = 'NIPC',
+    output_name = 'a',
 ):
 
     # # gemerate the einsums
@@ -25,26 +24,11 @@ def propagate_uq(
 
     # for i in range(len(rv_list)):
     #    uq_expand[rv_list[i]] = build_expansion_func(i, len(rv_list), num_nodes)
-    if method == 'MC' or method == 'kriging' or method == 'designed_quadrature':
-        n_qp = rvs[list(rvs.keys())[0]].shape[0]
-        n_rv = len(list(rvs.keys()))
-        sim = Simulator(rep)
-        output = np.ones((n_qp, 1))
-        tt = 0
-        for i in range(n_qp):
-            for j in range(n_rv):
-                sim[list(rvs.keys())[j]] = rvs[list(rvs.keys())[j]][i]
-            t1 = time.time()
-            sim.run()
-            t2 = time.time()
-            output[i][0] = sim[output_name]
-            tt = tt + t2-t1
-        return output, tt
 
     if method == 'NIPC':
         if not isinstance(rvs, dict):
             raise TypeError('rvs must be a dictionary')
-        # if len(rvs.keys()) > 2:
+        #if len(rvs.keys()) > 2:
         #    raise NotImplementedError('uq currently only works with 1 or 2 variables.')
 
         n_1d_qp = []
@@ -53,14 +37,16 @@ def propagate_uq(
         for key in rvs.keys():
             n_1d_qp.append(len(rvs[key]))
             n_qp = n_qp * len(rvs[key])
-        rv_samples = np.zeros((n_rv, n_qp))
+
+
+        rv_samples = np.zeros((n_rv,n_qp))
         result_dp_index = np.arange(n_rv)
         for i in range(n_rv):
             input_dp_index = [i]
-            rv_samples[i, :] = rv_expansion(
-                rvs[list(rvs.keys())[i]], input_dp_index, result_dp_index, n_1d_qp)
+            rv_samples[i,:] = rv_expansion(rvs[list(rvs.keys())[i]],input_dp_index,result_dp_index, n_1d_qp)
+
         sim = Simulator(rep)
-        output = np.ones((n_qp, 1))
+        output = []
         tt = 0
         for i in range(n_qp):
             for j in range(n_rv):
@@ -68,9 +54,10 @@ def propagate_uq(
             t1 = time.time()
             sim.run()
             t2 = time.time()
-            output[i][0] = sim[output_name]
+            output.append(sim[output_name][0])
             tt = tt + t2-t1
-        return output, tt
+        return output,tt
+
 
     if method == 'NIPC_ATE':
         """
@@ -125,9 +112,8 @@ def propagate_uq(
         # Errors
         if not isinstance(rvs, dict):
             raise TypeError('rvs must be a dictionary')
-        # if len(rvs.keys()) > 4:
-        #     raise NotImplementedError(
-        #         'uq currently only works with 1,2,3 or 4 variables.')
+        if len(rvs.keys()) > 2:
+            raise NotImplementedError('uq currently only works with 1 or 2 variables.')
 
         # update names of rep:
         for node in rep.flat_graph.nodes:
@@ -152,72 +138,30 @@ def propagate_uq(
         dep_data = rep.dependency_data(
             rvs.keys(),
             return_format='dictionary')
-        # :====================:THIS ENTIRE PART NEEDS TO BE AUTOMATED:====================:
-        num_nodes = rvs[list(rvs.keys())[0]].shape[0]  # need to be modifed !!
-        num_1d_qp = []
-        for i in range(len(rvs.keys())):
-            num_1d_qp.append(rvs[list(rvs.keys())[i]].shape[0])
 
-        partition_graph = nx.DiGraph()
+        # :====================:THIS ENTIRE PART NEEDS TO BE AUTOMATED:====================:
+        num_nodes = rvs[list(rvs.keys())[0]].shape[0] # need to be modifed !!
+        partition_graph = nx.DiGraph()  # digraph?
         initial_node = (None, )
 
-        # create all node keys
-        nodes = create_all_node_keys(rv_list)
-        nodes.append(initial_node)
+        if len(rvs.keys()) == 2: # include all of combinations
+            nodes = [initial_node, (rv_list[0],), (rv_list[1],), (rv_list[0], rv_list[1])]
 
-        for node in nodes:
-            build_node(partition_graph, node, rv_list,
-                       dep_data, rep, num_1d_qp)
-
-        # build all edges:
-        build_edges(partition_graph)
-
-        print('NUMBER OF EDGES: ', len(list(partition_graph.edges)))
-        print('NUMBER OF NODES: ', len(list(partition_graph.nodes)))
-        # exit()
+        for node in nodes: 
+            build_node(partition_graph, node, rvs, dep_data, rep)
+        if len(rvs.keys()) == 2: # include all of combinations
+            partition_graph.add_edge((None,), (rv_list[0],))
+            partition_graph.add_edge((None,), (rv_list[1],))
+            partition_graph.add_edge((rv_list[0],), (rv_list[0], rv_list[1]))
+            partition_graph.add_edge((rv_list[1],), (rv_list[0], rv_list[1]))
+            partition_graph.add_edge((None,), (rv_list[0], rv_list[1]))
 
         # gemerate the einsums
         uq_expand = {}
         num_nodes = rvs[list(rvs.keys())[0]].shape[0]
 
-        for edge in partition_graph.edges:
-            #print('\nEDGE', edge[0],edge[1])
-
-            # input indices
-            input_num_nodes = []
-            # print('INPUT NODE:')
-            input_list = []
-            for rv_var_node in edge[0]:
-                if rv_var_node == None:
-                    continue
-                else:
-                    input_list.append(rv_list.index(rv_var_node))
-                    input_num_nodes.append(
-                        num_1d_qp[rv_list.index(rv_var_node)])
-                    # print('i', rv_list.index(rv_var_node))
-
-            # input indices
-            output_num_nodes = []
-            # print('OUTPUT NODE:')
-            output_list = []
-            for rv_var_node in edge[1]:
-                if rv_var_node == None:
-                    continue
-                else:
-                    output_list.append(rv_list.index(rv_var_node))
-                    output_num_nodes.append(
-                        num_1d_qp[rv_list.index(rv_var_node)])
-                    # print('i', rv_list.index(rv_var_node))
-            # print(input_list, output_list)
-            # print('input', input_num_nodes)
-            # print('output', output_num_nodes)
-            partition_graph.edges[edge]['expansion_function'] = build_auto(
-                input_list, output_list, input_num_nodes, output_num_nodes)
-            # print(edge[1])
-            # print(partition_graph.nodes[edge[0]]['dep_index'])
-
-        # for i in range(len(rv_list)):
-        #     uq_expand[rv_list[i]] = build_expansion_func(i, len(rv_list), num_nodes)
+        for i in range(len(rv_list)):
+            uq_expand[rv_list[i]] = build_expansion_func(i, len(rv_list), num_nodes) 
 
         # uq_expand = {}
         # for i in range(len(rv_list)):
@@ -234,13 +178,10 @@ def propagate_uq(
         # -- intersection of all partions' operations is empty set
         # -- set of all partitions' operations == set of original representation's operations
         all_ops = set()
-
         check_partition(partition_graph, initial_node, [], all_ops)
-        num_ops = len([x for x in dep_data.keys()
-                       if isinstance(x, OperationNode)])
+        num_ops = len([x for x in dep_data.keys() if isinstance(x, OperationNode)])
         if len(all_ops) != num_ops:
-            raise ValueError(
-                'operation count mismatch between all partitions and original representation')
+            raise ValueError('operation count mismatch between all partitions and original representation')
 
         # execute
         output = {}
@@ -248,11 +189,9 @@ def propagate_uq(
         time_out = 0
         for node in nx.topological_sort(partition_graph):
             #print('COMPUTING PARTITION:', partition_graph.nodes[node]['string'])
-            x, time_run = run_partition(
-                partition_graph, node, rvs_with_node, uq_expand)
+            x, time_run = run_partition(partition_graph, node, rvs_with_node, uq_expand)
             output.update(x)
             time_out = time_out + time_run
-            print('time:', time_out)
         # t2 = time.time()
         return output[output_name], time_out
 
@@ -288,7 +227,7 @@ def run_partition(
         for rv in rvs:
             if rv.full_name in node_current['inputs'] and (len(node) == 1):
                 sim[rv.full_name] = rvs[rv][i]
-
+                
         # run simulation for node i
         t1 = time.time()
         sim.run()
@@ -297,34 +236,28 @@ def run_partition(
 
         # set output for i
         for output_name in node_current['outputs']:
-            node_current['outputs'][output_name][i,
-                                                 :] = sim[output_name].copy()
+            node_current['outputs'][output_name][i, :] = sim[output_name].copy()
 
     # all outputs should now be computed.
     # apply expansion function for each output and set as successor inputs
     for output_name in node_current['outputs']:
-        # for successor in partition_graph.successors(node):
-        # s_name = partition_graph.nodes[successor]['string']
-        for edge in partition_graph.out_edges(node):
-            successor = edge[1]
-            rv_expansion = partition_graph.edges[edge]['expansion_function']
-
+        for successor in partition_graph.successors(node):
+            s_name = partition_graph.nodes[successor]['string']
             if output_name in partition_graph.nodes[successor]['inputs']:
                 #print(f'\toutput for {s_name}: ', output_name)
 
-                new_input = rv_expansion(node_current['outputs'][output_name])
-                # current_rv_set = set(node)
-                # if None in node:
-                #     current_rv_set = set()
-                # successor_rv_set = set(successor)
-                # for i, rv_node in enumerate(successor_rv_set.symmetric_difference(current_rv_set)):
-                #     if i == 0:
-                #         new_input = uq_expand[rv_node](node_current['outputs'][output_name])
-                #     else:
-                #         new_input = uq_expand[rv_node](new_input)
+                current_rv_set = set(node)
+                if None in node:
+                    current_rv_set = set()
+                successor_rv_set = set(successor)
+                for i, rv_node in enumerate(successor_rv_set.symmetric_difference(current_rv_set)):
+                    if i == 0:
+                        new_input = uq_expand[rv_node](node_current['outputs'][output_name])
+                    else:
+                        new_input = uq_expand[rv_node](new_input)
 
-                # if partition_graph.nodes[successor]['inputs'][output_name].shape != new_input.shape:
-                #     raise ValueError('shape mismatch')
+                if partition_graph.nodes[successor]['inputs'][output_name].shape != new_input.shape:
+                    raise ValueError('shape mismatch')
 
                 partition_graph.nodes[successor]['inputs'][output_name] = new_input
 
@@ -361,8 +294,7 @@ def check_partition(partition_graph, node, checked, all_ops):
                 print(pred)
                 print(pred_outputs)
                 print(all_pred_outputs)
-                raise ValueError('overlapping outputs: ',
-                                 pred_outputs.intersection(all_pred_outputs))
+                raise ValueError('overlapping outputs: ', pred_outputs.intersection(all_pred_outputs))
 
             all_pred_outputs.update(pred_outputs)
         print('\tclear: no overlapping outputs in current partition predecessors')
@@ -372,8 +304,7 @@ def check_partition(partition_graph, node, checked, all_ops):
             print(partition_graph.nodes[node]['string'], diff)
             print('current inputs', current_inputs)
             print('pred outputs', all_pred_outputs)
-            raise KeyError(
-                'input not subset of outputs of partitioned predecessors functions')
+            raise KeyError('input not subset of outputs of partitioned predecessors functions')
         print('\tclear: inputs of current partition is subset of predecessors\' outputs')
 
     checked.append(node)
@@ -386,10 +317,9 @@ def check_partition(partition_graph, node, checked, all_ops):
 def build_node(
     pg,
     tuple_rv,
-    rv_list,
+    rvs,
     dd,
     rep,
-    num_1d_qp,
 ):
     """
     Parameters:
@@ -406,16 +336,11 @@ def build_node(
 
     # Add node hash
     pg.add_node(tuple_rv)
-    # num_nodes = rvs[list(rvs.keys())[0]].shape[0]
+    num_nodes = rvs[list(rvs.keys())[0]].shape[0]
     if None in tuple_rv:
         size = 1
     else:
-        size = 1
-        for rv_var_node in tuple_rv:
-            size *= num_1d_qp[rv_list.index(rv_var_node)]
-            # print(size)
-        # OLD:
-        # size = int(num_nodes**len(tuple_rv))
+        size = int(num_nodes**len(tuple_rv))
     pg.nodes[tuple_rv]['size'] = size
 
     # string name of node
@@ -457,16 +382,12 @@ def build_node(
             if (len(list(rep2.flat_graph.successors(node))) == 0) or (len(list(rep2.flat_graph.successors(node))) < len(list(rep.flat_graph.successors(node)))):
                 # if (len(list(rep2.flat_graph.successors(node))) == 0):
                 if does_match(dd, node, tuple_rv):
-                    pg.nodes[tuple_rv]['outputs'][node.full_name] = np.zeros(
-                        (size, *shape))
+                    pg.nodes[tuple_rv]['outputs'][node.full_name] = np.zeros((size, *shape))
             # if None in tuple_rv:
             #     pg.nodes[tuple_rv]['outputs'][node.full_name] = np.zeros((size, *shape))
 
             if len(list(rep2.flat_graph.predecessors(node))) == 0:
-                pg.nodes[tuple_rv]['inputs'][node.full_name] = np.zeros(
-                    (size, *shape))
-
-    pg.nodes[tuple_rv]['dep_index'] = 1  # !!!!!
+                pg.nodes[tuple_rv]['inputs'][node.full_name] = np.zeros((size, *shape))
 
 
 def does_match(dd, node, tuple_rv):
@@ -497,60 +418,7 @@ def build_expansion_func(i, num_rvs, num_nodes):
     return expansion_func
 
 
-def build_auto(input_dp_index, result_dp_index, input_n_1d_qp, output_n_1d_qp):
-
-    def expansion_func(x):
-        index_letter_list = list(string.ascii_lowercase)
-        n_qp = 1
-        for i in output_n_1d_qp:
-            n_qp = n_qp*i
-        einsum_input_string1 = ''
-        einsum_input_string2 = ''
-        einsum_output_string = ''
-        expand_index = []
-        for index in result_dp_index:
-            if index in input_dp_index:
-                einsum_input_string1 += index_letter_list[index]
-            if index not in input_dp_index:
-                einsum_input_string2 += index_letter_list[index]
-                expand_index.append(index)
-            einsum_output_string += index_letter_list[index]
-        einsum_input_string1 += '...'
-        einsum_input_string2 += '...'
-        einsum_output_string += '...'
-        matrix1_size = []
-        for i in expand_index:
-            index = result_dp_index.index(i)
-            matrix1_size.append(output_n_1d_qp[index])
-            #print('missing index', index)
-        matrix1_size.append(1)
-        out_shape = list(x.shape)
-        out_shape[0] = n_qp
-        out_shape = tuple(out_shape)
-        # print('####################')
-        #print('input index', input_dp_index)
-        #print('output index', result_dp_index)
-        # print(f'{einsum_input_string1},{einsum_input_string2}->{einsum_output_string}')
-        #print('x shape:', x.shape)
-        # print(tuple(matrix1_size))
-        #print('output shape: ', out_shape)
-        if len(input_dp_index) <= 1:
-            return np.reshape(np.einsum(f'{einsum_input_string1},{einsum_input_string2}->{einsum_output_string}', x, np.ones(tuple(matrix1_size))), out_shape)
-        else:
-            in_shape = list(x.shape)
-            #print('original shape: ', in_shape)
-            in_shape.pop(0)
-            insert_indx = 0
-            for j in range(len(input_dp_index)):
-                in_shape.insert(insert_indx, input_n_1d_qp[j])
-                insert_indx += 1
-            in_shape = tuple(in_shape)
-            #print('new shape: ', in_shape)
-            return np.reshape(np.einsum(f'{einsum_input_string1},{einsum_input_string2}->{einsum_output_string}', np.reshape(x, in_shape), np.ones(tuple(matrix1_size))), out_shape)
-    return expansion_func
-
-
-def rv_expansion(rv1, input_dp_index, result_dp_index, n_1d_qp):
+def rv_expansion(rv1,input_dp_index,result_dp_index, n_1d_qp):
     index_letter_list = list(string.ascii_lowercase)
     n_qp = 1
     for i in result_dp_index:
@@ -569,61 +437,10 @@ def rv_expansion(rv1, input_dp_index, result_dp_index, n_1d_qp):
     einsum_input_string1 += '...'
     einsum_input_string2 += '...'
     einsum_output_string += '...'
-    matrix1_size = []
+    matrix1_size = [] 
     for i in expand_index:
         matrix1_size.append(n_1d_qp[i])
     matrix1_size.append(1)
-    x1 = np.einsum(f'{einsum_input_string1},{einsum_input_string2}->{einsum_output_string}',
-                   rv1, np.ones(tuple(matrix1_size)))
-    x2 = np.reshape(x1, (n_qp))
+    x1 = np.einsum(f'{einsum_input_string1},{einsum_input_string2}->{einsum_output_string}', rv1, np.ones(tuple(matrix1_size)))
+    x2 = np.reshape(x1,(n_qp))
     return x2
-
-
-def create_all_node_keys(rv_list):
-    # Return a list of all possible combinations of random variables
-
-    from itertools import chain, combinations
-    num_rvs = len(rv_list)
-    s = list(range(0, num_rvs))
-
-    # get powerset
-    n_indices = chain.from_iterable(combinations(s, r)
-                                    for r in range(1, len(s)+1))
-
-    # use rv_list elements instead of integers
-    nodes = []
-    for index_tuple in n_indices:
-        node_temp = []
-
-        for index in index_tuple:
-            node_temp.append(rv_list[index])
-
-        nodes.append(tuple(node_temp))
-
-    return nodes
-
-
-def build_edges(g):
-
-    # n^2 algorithm, for each node u, check all other nodes v and check if u is a subset of v. If so, add edge
-    for u in g.nodes:
-
-        # set of rvs defined by u
-        u_set = set(u)
-
-        for v in g.nodes:
-
-            # do not build self edges
-            if u == v:
-                continue
-            # add edge from None to all
-            if u == (None,):
-                g.add_edge(u, v)
-                continue
-
-            # set of rvs defined by v
-            v_set = set(v)
-
-            # if v depends on u, add edge
-            if u_set.issubset(v):
-                g.add_edge(u, v)
