@@ -216,7 +216,8 @@ class SystemGraph(object):
                         if not isinstance(node.var, (Output, Input)):
                             if np.array_equal(node.var.val, np.ones(node.var.shape)):
                                 f.write(f'\tWARNING: this declared variable is not a promotion or connection target with a value being set.\n')
-
+                            else:
+                                f.write(f'\tWARNING: this declared variable is not a promotion or connection. \n')
                     f.write(f'\tCONNECTED TO: {connected_to_bool}\n')
                     for connected_to_node in node.connected_to:
                         f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}.{connected_to_node.name}\n')
