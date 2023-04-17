@@ -82,6 +82,7 @@ class Simulator(SimulatorBase):
         self.obj = self.rep.objective
         self.cvs = self.rep.constraints
         self.dont_remember_initial = set()
+        self.state_2_hybrid = {} #state node to hybrid operation for SURF
 
         # if an objective is specified, this is an optimization problem
         if self.obj:
@@ -1010,16 +1011,79 @@ class Simulator(SimulatorBase):
 
     def set_implicit_guess_and_tol(self, state_name, initial_guess, tolerance):
         """
-        set initial guess of state called "state_name"
+        set initial guess of state called "state_name". This works for 
         """
         state_id = self._find_unique_id(state_name)
-        self.dont_remember_initial.add(state_id)
-        guess_id = self.system_graph.all_state_ids_to_guess[state_id]
-        self.state_vals[guess_id] = initial_guess
+        state_id_node = self.system_graph.unique_to_node[state_id]
 
-        # print(self.system_graph.all_state_ids_to_implicit_operations[state_id].solver.tol)
-        self.system_graph.all_state_ids_to_implicit_operations[state_id].solver.tol = tolerance
-        # print(self.system_graph.all_state_ids_to_implicit_operations[state_id].solver.tol)
+        # Hybrid
+        if state_id_node in self.state_2_hybrid:
+            self.state_2_hybrid[state_id_node].op.set_tolerance_and_guess(state_name, initial_guess, tolerance)
+        # standard implicit
+        else:
+            self.dont_remember_initial.add(state_id)
+            guess_id = self.system_graph.all_state_ids_to_guess[state_id]
+            self.state_vals[guess_id] = initial_guess
+
+            # print(self.system_graph.all_state_ids_to_implicit_operations[state_id].solver.tol)
+            self.system_graph.all_state_ids_to_implicit_operations[state_id].solver.tol = tolerance
+            # print(self.system_graph.all_state_ids_to_implicit_operations[state_id].solver.tol)
+    
+    
+    def get_hybrid_state_and_residual_names(self):
+        from csdl.utils.collect_hybrid_implicit_operations import collect_hybrid_implicit_operations
+
+        hybrid_implicit_operations_map = collect_hybrid_implicit_operations(self.rep)
+        
+        # need mapping of state to hybrid operation for setting guesses, tolerances, etc
+        self.state_2_hybrid = {}
+
+        state_to_res = {} # dictionary to return
+        state_given_to_real = {}
+        res_given_to_real = {}
+        for h_name, h_dict in hybrid_implicit_operations_map.items():
+            if h_dict['mode'] == 'explicit':
+                s2r_map = h_dict['states_to_res']
+                h_op = h_dict['operation_node']
+
+                # For all inputs in hybrid explicit,
+                # map given name of state to unpromoted name
+                # by checking to see if the fully promoted state names are the same with rep and given names
+                # Repeat for hybrid but with residuals
+
+                # Look for states
+                for rep_input in self.system_graph.eval_graph.predecessors(h_op):
+                    for state_given_name, res_given_name in s2r_map.items():
+
+                        fully_given_promoted = state_given_name.split('.')[-1]
+                        fully_rep_promoted = rep_input.promoted_id.split('.')[-1]
+                        if fully_rep_promoted == fully_given_promoted:
+                            if state_given_name in state_given_to_real:
+                                raise KeyError('DEV error: given state name already mapped')
+                            
+                            state_promoted_id = rep_input.promoted_id
+                            state_given_to_real[state_given_name] = state_promoted_id
+
+                            # map this state to implicit hybrid operation node
+                            h_name_without_explicit = h_name[8:]
+                            h_name_implicit = 'implicit'+h_name_without_explicit
+                            self.state_2_hybrid[rep_input] = hybrid_implicit_operations_map[h_name_implicit]['operation_node']
+                # Look for residual
+                for rep_output in self.system_graph.eval_graph.successors(h_op):
+                    for state_given_name, res_given_name in s2r_map.items():
+                        
+                        fully_given_promoted = res_given_name.split('.')[-1]
+                        fully_rep_promoted = rep_output.promoted_id.split('.')[-1]
+                        if fully_rep_promoted == fully_given_promoted:
+                            if res_given_name in res_given_to_real:
+                                raise KeyError('DEV error: given res name already mapped')
+                            res_given_to_real[res_given_name] = rep_output.promoted_id
+
+        # perform correct mapping
+        for promoted_state, promoted_residual in h_dict['states_to_res'].items():
+            state_to_res[state_given_to_real[promoted_state]] = res_given_to_real[promoted_residual]
+        
+        return state_to_res
     
     # def find_variables_between(self, source_name, target_name):
     #     """
