@@ -131,7 +131,15 @@ class OperationBase():
                     csdl_pred_name = csdl_pred.name.split('.')[-1]
                 else:
                     csdl_pred_name = csdl_pred.name
-                if csdl_pred_name == pred.name:
+
+                # check names
+                if '.' in pred.name:
+                    pred_name = pred.name.split('.')[-1]
+                else:
+                    pred_name = pred.name
+
+                # print(csdl_pred_name, pred.name)
+                if csdl_pred_name == pred_name:
 
                     # If we already found a match, raise an error
                     if found_match:
