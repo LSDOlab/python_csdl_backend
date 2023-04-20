@@ -822,15 +822,20 @@ class Simulator(SimulatorBase):
 
             self.state_vals[dv_id] = new_val.reshape(shape)
 
-    def compute_total_derivatives(self, check_failure=False):
+    def compute_total_derivatives(self, additional_ofs = [], additional_wrts = [],check_failure=False):
         """
         computes derivatives of objective/constraints wrt design variables.
+
+        optionally, compute any additional derivatives if needed.
         """
 
         # return error if not optimization problem
         self.check_if_optimization(self.opt_bool)
 
-        hash_key, ofs, wrts = self.get_totals_key(self.output_keys, self.dv_keys)
+        of_keys = self.output_keys + additional_ofs
+        in_keys = self.dv_keys + additional_wrts
+        
+        hash_key, ofs, wrts = self.get_totals_key(of_keys, in_keys)
 
         if check_failure:
             try:
@@ -1083,7 +1088,90 @@ class Simulator(SimulatorBase):
         for promoted_state, promoted_residual in h_dict['states_to_res'].items():
             state_to_res[state_given_to_real[promoted_state]] = res_given_to_real[promoted_residual]
         
+        self.state_to_res = state_to_res
+
         return state_to_res
+    
+
+    def compute_SURF_derivatives(self):  
+        """
+        computes total derivatives (of objective and constraints with respect to design variables) in addition to residual outputs
+        and state inputs
+        """
+
+        # get residuals (outputs) and states (inputs) to take extra derivatives of
+        surf_residuals = list(self.state_to_res.values())
+        surf_states = list(self.state_to_res.keys())
+
+        return self.compute_total_derivatives(additional_ofs=surf_residuals, additional_wrts=surf_states, check_failure=True)
+
+    def get_SURF_derivatives(self):
+        """
+        return six sets of derivatives required by SURF:
+        All derivatives are scaled appropriately
+        
+        1) dF/dx (objective gradient, same from standard optimization)     --> concatenated numpy array
+        2) dC/dx (constraint Jacobian, same from standard optimization)    --> concatenated numpy array
+        3) dF/dy (objective wrt states)                                    --> dict[<state_name>] -> dF/d(state_name):numpy array
+        4) dC/dy (constraints wrt states)                                  --> dict[<state_name>] -> dC/d(state_name):numpy array
+        5) dR/dx (residuals wrt dvs)                                       --> dict[<state_name>] -> d(state_name)/dx:numpy array
+        6) dR/dy (residuals wrt states)                                    --> dict[<state_name>] -> d(residual of state_name)/d(state_name):numpy array
+        """
+        # 1) dF/dx
+        dF_dx = self.objective_gradient()
+
+        # 2) dC/dx
+        dC_dx = self.constraint_jacobian()
+
+        # 3, 4, 5, 6)
+        dF_dy = {}
+        dC_dy = {}
+        dR_dx = {}
+        dR_dy = {}
+        for state_name in self.state_to_res:
+            #  state size and corresponding residual size
+            state_size = np.prod(self[state_name].shape)
+            residual_name = self.state_to_res[state_name]
+
+            # 3) dF/dy 
+            obj_name = self.obj['name']
+            obj_scaler = self.obj['scaler']
+            if sp.issparse(self.optimization_derivatives[obj_name, state_name]):
+                dF_dy[state_name] = (self.optimization_derivatives[obj_name, state_name].toarray()).flatten()*(obj_scaler)
+            else:
+                dF_dy[state_name] = (self.optimization_derivatives[obj_name, state_name]).flatten()*(obj_scaler)
+
+            # 4) dC/dy
+            constraint_jac = np.zeros((self.total_constraint_size, state_size))
+            for c_name, c_dict in self.cvs.items():
+                i_lower_c = c_dict['index_lower']
+                i_upper_c = c_dict['index_upper']
+                c_scaler = c_dict['scaler'].flatten()
+                if sp.issparse(self.optimization_derivatives[c_name, state_name]):
+                    constraint_jac[i_lower_c:i_upper_c, : ] = (self.optimization_derivatives[c_name, state_name].toarray())*(c_scaler)
+                else:
+                    constraint_jac[i_lower_c:i_upper_c, :] = self.optimization_derivatives[c_name, state_name]*(c_scaler)
+            dC_dy[state_name] = constraint_jac
+
+            # 5) dR/dx
+            dR_dx_temp = np.zeros((state_size, self.total_dv_size))
+            for dv_name, dv_dict in self.dvs.items():
+                i_lower_dv = dv_dict['index_lower']
+                i_upper_dv = dv_dict['index_upper']
+                d_scaler = dv_dict['scaler'].flatten()
+                if sp.issparse(self.optimization_derivatives[residual_name, dv_name]):
+                    dR_dx_temp[:, i_lower_dv:i_upper_dv] = (self.optimization_derivatives[residual_name, dv_name].toarray())/(d_scaler)
+                else:
+                    dR_dx_temp[:, i_lower_dv:i_upper_dv] = self.optimization_derivatives[residual_name, dv_name]/(d_scaler)
+            dR_dx[state_name] = dR_dx_temp
+
+            # 6) dR/dy
+            if sp.issparse(self.optimization_derivatives[residual_name, state_name]):
+                dR_dy[state_name] = (self.optimization_derivatives[residual_name, state_name].toarray())
+            else:
+                dR_dy[state_name] = (self.optimization_derivatives[residual_name, state_name])
+
+        return dF_dx, dC_dx, dF_dy, dC_dy, dR_dx, dR_dy
     
     # def find_variables_between(self, source_name, target_name):
     #     """
