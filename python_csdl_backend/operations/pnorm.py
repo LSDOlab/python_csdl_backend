@@ -120,4 +120,4 @@ class VectorizedAxisWisePNormLite(OperationBase):
             partials_block.write(f'{partial_name}[{row_name},{col_name}] = np.einsum(\'{self.operation}\', {output}**(1 - {self.pnorm_type}), {input}**({self.pnorm_type} - 1)).flatten()')
 
     def determine_sparse(self):
-        return False
+        return True
