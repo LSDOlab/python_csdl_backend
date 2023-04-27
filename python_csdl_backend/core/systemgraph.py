@@ -812,7 +812,7 @@ class SystemGraph(object):
                 else:  # case 3:
                     rev_block.comment(f'{totals_name} = zero')
                     input_size = np.prod(self.unique_to_node[input_id].var.shape)
-                    prerev_vars[totals_name] = np.zeros((output_size, input_size))
+                    prerev_vars[totals_name] = sp.csc_matrix((output_size, input_size))
 
             # print statement
             print_loading(
