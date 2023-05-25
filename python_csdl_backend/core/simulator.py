@@ -105,6 +105,7 @@ class Simulator(SimulatorBase):
         # :::::ANALYTICS:::::
 
         # model and graph creation
+        self.comm = comm
         self.system_graph = SystemGraph(
             self.rep,
             mode=mode,
@@ -113,12 +114,11 @@ class Simulator(SimulatorBase):
             objective=self.obj,
             constraints=self.cvs,
             opt_bool=self.opt_bool)
-
+        self.system_graph.comm = comm
         # =--=-==-=-=-=-=-=-=-=-=-=-=-=-PARALELIZATION=--=-==-=-=-=-=-=-=-=-=-=-=-=-
-        self.comm = comm
         if comm:
             from dag_parallelizer import create_csdl_like_graph, assign_costs, Scheduler, rep2parallelizable
-            from dag_parallelizer.schedulers import MTA, MTA_ETA, MTA_PT2PT_INSERTION
+            from dag_parallelizer.schedulers import MTA, MTA_ETA, MTA_PT2PT_INSERTION, MTA_PT2PT_ARB
             from dag_parallelizer.compiler.generator import code_generator
             from dag_parallelizer.compiler.run_code import run_code 
             ccl_graph, str2nodes = rep2parallelizable(
@@ -134,20 +134,22 @@ class Simulator(SimulatorBase):
             OP_COST = VARIABLE_SIZE/100
 
             # Graph partitioning:
-            PARTITION_TYPE = MTA()
+            # PARTITION_TYPE = MTA()
             # PARTITION_TYPE = MTA_ETA()
             # PARTITION_TYPE = MTA_PT2PT_INSERTION()
+            PARTITION_TYPE = MTA_PT2PT_ARB()
 
             PROFILE = 0
             MAKE_PLOTS = 0
             # MAKE_PLOTS = 1
-            VISUALIZE_SCHEDULE = 0
+            # VISUALIZE_SCHEDULE = 0
+            VISUALIZE_SCHEDULE = 1
 
-            assign_costs(
-                ccl_graph,
-                communication_cost = COMM_COST,
-                operation_cost = OP_COST,
-            )
+            # assign_costs(
+            #     ccl_graph,
+            #     communication_cost = COMM_COST,
+            #     operation_cost = OP_COST,
+            # )
 
             # Create a schedule from a choice of algorithms
             scheduler = Scheduler(PARTITION_TYPE, comm)
@@ -161,7 +163,7 @@ class Simulator(SimulatorBase):
             # print(str2nodes)
             schedule_new = []
             for node in schedule:
-                if ('SEND' in node) or ('GET' in node) or ('WAIT' in node):
+                if ('SEND' in node) or ('GET' in node) or ('WAIT' in node) or ('IRECV' in node)  or ('SsENDONLY' in node) or ('irecvwait' in node) or ('W/F' in node):
                     schedule_new.append(node)
                 else:
                     schedule_new.append(str2nodes[node])
@@ -197,8 +199,9 @@ class Simulator(SimulatorBase):
         # :::::ANALYTICS:::::
 
         # prepare design variable vectors
-        if self.opt_bool:
-            self.process_optimization_vars()
+        # TODO: uncomment
+        # if self.opt_bool:
+        #     self.process_optimization_vars()
 
         #  ----------- create model evaluation script -----------
         if comm:
@@ -347,8 +350,8 @@ class Simulator(SimulatorBase):
         # except:
         #     pass
 
-        if remember_implicit_states:
-            self.remember_implicit_states()
+        # if remember_implicit_states:
+        #     self.remember_implicit_states()
             # print("remember")
 
         eval_vars = {**states, **self.preeval_vars}

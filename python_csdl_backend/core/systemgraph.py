@@ -298,7 +298,7 @@ class SystemGraph(object):
                     csdl_node.val = csdl_node.val.astype('float64')
                     if isinstance(csdl_node.val, np.matrix):
                         csdl_node.val = np.asarray(csdl_node.val).astype('float64')
-                state_vals[node.id] = csdl_node.val
+                state_vals[node.id] = csdl_node.val.copy()
 
                 promoted_id = node.promoted_id
 
@@ -321,13 +321,15 @@ class SystemGraph(object):
 
                 # only write stuff for operations.
                 continue
-
+        
+        num_coms = 0
+        num_ops = 0
         for node in self.rep.schedule:
 
             all_op_classes = (StandardOperation, CustomExplicitOperation, ImplicitOperation, BracketedSearchOperation, CustomImplicitOperation)
             if isinstance(node, str):
-                from dag_parallelizer.compiler.generator import generate_receive, generate_send
-                if 'WAIT' in node:
+                # from dag_parallelizer.compiler.generator import generate_receive, generate_send
+                if ('WAIT' in node) or ('W/F' in node):
                     continue
 
                 split_string = node.split("/")
@@ -337,15 +339,24 @@ class SystemGraph(object):
                 var_num = var_id.split("_")[0][1:]
                 var_num = int(var_num)
                 node_int = (var_id, var_num)
-                if 'SEND' in node:
-                    eval_block.write(generate_send(node, var_node.var.shape, node_int))
-                elif 'GET' in node:
-                    eval_block.write(generate_receive(node, var_node.var.shape, node_int))
-                else:
-                    raise ValueError('lkjsdfsndsfdslknfsdknfsdkjnfkjsdnfkjds')
-            # elif isinstance(node.op, all_op_classes):
-            elif isinstance(node, OperationNode):
+                # if 'SEND' in node:
+                #     eval_block.write(generate_send(node, var_node.var.shape, node_int))
+                # elif 'GET' in node:
+                #     eval_block.write(generate_receive(node, var_node.var.shape, node_int))
+                # else:
+                #     raise ValueError('lkjsdfsndsfdslknfsdknfsdkjnfkjsdnfkjds')
 
+                # print(node)
+                from dag_parallelizer.compiler.generator import generate_mpi_operators
+
+                string, num_coms = generate_mpi_operators(node, var_node.var.shape, num_coms, tag = node_int)
+                
+                if string == 'continue':
+                    continue
+                elif string is not None:
+                    eval_block.write(string)            # elif isinstance(node.op, all_op_classes):
+            elif isinstance(node, OperationNode):
+                num_ops += 1
                 csdl_node = node.op
 
                 # input to operation_lite object
@@ -402,6 +413,10 @@ class SystemGraph(object):
                 if back_operation.needs_input_reshape:
                     eval_block.write(back_operation.unreshape_block)
                 # +=+=+=+=+=+=+=+=+=+=+=+=+==+= end evaluation procedure +=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+        if self.comm:
+            print(f'{self.comm.rank} ({num_coms} COMMS/{num_ops} OPS)')
+            eval_block.write('comm.barrier()')
 
         return eval_block, preeval_vars, state_vals, variable_info
 
