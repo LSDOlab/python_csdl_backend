@@ -143,7 +143,7 @@ class Simulator(SimulatorBase):
             MAKE_PLOTS = 0
             # MAKE_PLOTS = 1
             # VISUALIZE_SCHEDULE = 0
-            VISUALIZE_SCHEDULE = 1
+            VISUALIZE_SCHEDULE = 0
 
             # assign_costs(
             #     ccl_graph,
