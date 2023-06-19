@@ -1,5 +1,4 @@
 from csdl import Model
-from csdl_om import Simulator
 from python_csdl_backend.tests.create_single_test import run_test
 import csdl
 import numpy as np
