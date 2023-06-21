@@ -29,6 +29,7 @@ class OperationBase():
         self.jac_is_function = False
         self.op_summary_block = CodeBlock(add_name=False)
         self.elementwise = operation.properties['elementwise']
+        self.linear:bool = False
 
         # map to landuage variable and representation variable
         self.input_csdl_to_rep = {}
@@ -249,7 +250,7 @@ class OperationBase():
 
     def determine_sparse_default_elementwise(self, input_size):
 
-        if input_size > 100:
+        if input_size > 50:
             return True
         else:
             return False

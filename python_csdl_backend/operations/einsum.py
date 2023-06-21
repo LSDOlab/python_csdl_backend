@@ -31,7 +31,8 @@ class EinSumLite(OperationBase):
         self.out_name = operation.outs[0].name
         self.operation_ss = operation.literals['subscripts']
         out_shape = operation.outs[0].shape
-        self.in_vals = [var.val for var in operation.dependencies]
+        # self.in_vals = [var.val for var in operation.dependencies]
+        self.in_vals = [0 for var in operation.dependencies]
 
         # Find unused characters in operation
         check_string = 'abcdefghijklmnopqrstuvwxyz'

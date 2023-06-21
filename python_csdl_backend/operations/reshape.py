@@ -20,6 +20,7 @@ class ReshapeLite(OperationBase):
         name = f'{name} {op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
         self.elementwise = True
+        self.linear = True
 
         self.in_name = get_only(self.nx_inputs_dict)
         self.invar = self.operation.dependencies[0]
@@ -31,7 +32,7 @@ class ReshapeLite(OperationBase):
         self.outshape = self.outvar.shape
         self.size = np.prod(self.shape)
 
-        self.val = self.invar.val
+        # self.val = self.invar.val
 
     def get_evaluation(self, eval_block, vars):
         eval_block.write(f'{self.out_name} = {self.in_name}.reshape({self.outshape})')

@@ -16,6 +16,7 @@ class LinearCombinationLite(OperationBase):
         op_name = 'linear_combination'
         name = f'{name}_{op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.linear = True
 
         self.constant = self.operation.literals['constant']
         self.in_names = [d.name for d in self.operation.dependencies]

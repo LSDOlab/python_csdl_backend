@@ -24,7 +24,7 @@ class DecomposeLite(OperationBase):
         self.invar = self.nx_inputs_dict[self.in_name].var
         self.src_indices = self.operation.src_indices
         self.shape = self.invar.shape
-        self.val = self.invar.val
+        # self.val = self.invar.val
 
     def get_evaluation(self, eval_block, vars):
 

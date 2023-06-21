@@ -17,6 +17,7 @@ import networkx as nx
 
 class Simulator(SimulatorBase):
 
+    # @profile
     def __init__(self,
                  representation,
                  mode='rev',
@@ -48,8 +49,8 @@ class Simulator(SimulatorBase):
             display_scripts: bool
                 (EXPERIMENTAL) saves derivative and evaluation scripts as a python 
                 files for debugging. These files are not used for computation.
-
         """
+
         self.display_scripts = display_scripts
         self.recorder = None
         if not isinstance(root, bool):
@@ -133,7 +134,7 @@ class Simulator(SimulatorBase):
         if self.opt_bool:
             self.process_optimization_vars()
 
-        #  ----------- create model evaluation script -----------
+        # ----------- create model evaluation script -----------
         self.eval_instructions = Instructions(f'RUN_MODEL')
 
         # This line basically creates the mode evaluation graph
@@ -145,7 +146,7 @@ class Simulator(SimulatorBase):
         if self.display_scripts:
             self.eval_instructions.save()
 
-        #  ----------- create model evaluation script -----------
+        # ----------- create model evaluation script -----------
 
         # set up derivatives
         for var in state_vals_extracted:
@@ -198,7 +199,7 @@ class Simulator(SimulatorBase):
 
         # generate script
         print(f'\ngenerating: {adj_name}')
-        rev_script, pre_vars = self.system_graph.generate_reverse(output_ids, input_ids)
+        rev_script, pre_vars, stats = self.system_graph.generate_reverse(output_ids, input_ids)
 
         # write the computation steps
         adj_instructions.script.write(rev_script)
@@ -207,8 +208,9 @@ class Simulator(SimulatorBase):
         if self.display_scripts:
             adj_instructions.save()
         adj_instructions.compile()
-        return adj_instructions, pre_vars
-
+        return adj_instructions, pre_vars, stats
+    
+    # @profile
     def run(
             self,
             check_failure=False,
@@ -248,9 +250,14 @@ class Simulator(SimulatorBase):
                 self.recorder.record(save_dict, 'simulator')
                 # print('RECORDING TIME:', time.time() - start)
 
+        num_floats = 0
         for key in self.state_vals:
             self.state_vals[key] = new_states[key]
+            num_floats += self.state_vals[key].nbytes
 
+        # print('NUM ALLOCATED', len(self.state_vals))
+        # print('NUM FLOATS ALLOCATED', num_floats)
+        # print(self.state_vals[key].size, key)
         if check_failure:
             return failure_flag
 
@@ -299,11 +306,12 @@ class Simulator(SimulatorBase):
 
         hash_key = (tuple(ofs), tuple(wrts))
 
-        exec, vars = self._generate_adjoint(ofs, wrts)
+        exec, vars, stats = self._generate_adjoint(ofs, wrts)
 
         self.derivative_instructions_map[hash_key] = {}
         self.derivative_instructions_map[hash_key]['precomputed_vars'] = vars
         self.derivative_instructions_map[hash_key]['executable'] = exec
+        self.derivative_instructions_map[hash_key]['statistics'] = stats
 
     def get_totals_key(self, of, wrt):
         """
@@ -819,7 +827,8 @@ class Simulator(SimulatorBase):
             dv_id = self._find_unique_id(dv_name)
 
             self.state_vals[dv_id] = new_val.reshape(shape)
-
+    
+    # @profile
     def compute_total_derivatives(self, check_failure=False):
         """
         computes derivatives of objective/constraints wrt design variables.
@@ -1003,7 +1012,10 @@ class Simulator(SimulatorBase):
         sets the initial guesses of all implicit operations as the current solved state
         """
         for state_id, guess_id in self.system_graph.all_state_ids_to_guess.items():
-            self.state_vals[guess_id] = self.state_vals[state_id]
+            if state_id not in self.state_vals:
+                self.state_vals[guess_id] = np.ones(self._get_unique_node(state_id).var.shape)
+            else:
+                self.state_vals[guess_id] = self.state_vals[state_id]
 
     # def find_variables_between(self, source_name, target_name):
     #     """

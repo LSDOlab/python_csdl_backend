@@ -23,6 +23,7 @@ class ExpandArrayLite(OperationBase):
         op_name = 'expand_array'
         name = f'{name} {op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.linear = True
 
         input_name_id = get_only(self.nx_inputs_dict)
         output_name_id = get_only(self.nx_outputs_dict)
@@ -34,7 +35,7 @@ class ExpandArrayLite(OperationBase):
         self.invar = self.nx_inputs_dict[input_name_id].var
 
         self.out_shape = self.outvar.shape
-        self.val = self.invar.val
+        # self.val = self.invar.val
         self.expand_indices = operation.literals['expand_indices']
 
         # self.outname = get_only(self.nx_outputs_dict)
@@ -64,6 +65,7 @@ class ExpandArrayLite(OperationBase):
         self.ones_shape = ones_shape
 
         self.rows = out_indices.flatten()
+        # print(ones_shape)
         self.cols = np.einsum(einsum_string, in_indices, np.ones(ones_shape,
                                                                  int)).flatten()
         # self.declare_partials(out_name, self.inname, val=1., rows=rows, cols=cols)
@@ -120,7 +122,7 @@ class ExpandScalarLite(OperationBase):
         self.invar = self.nx_inputs_dict[input_name_id].var
 
         self.out_shape = self.outvar.shape
-        self.val = self.invar.val
+        # self.val = self.invar.val
 
     def get_evaluation(self, eval_block, vars):
 

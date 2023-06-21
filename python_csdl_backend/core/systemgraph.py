@@ -48,6 +48,7 @@ class SystemGraph(object):
         self.constraints = constraints
         self.opt_bool = opt_bool
         self.num_ops = 0
+        self.num_vars = 0
         self.all_implicit_operations = set()  # set of all implicit operations
         self.all_state_ids_to_guess = {}  # maps state ids to the names of the initial guess
 
@@ -95,6 +96,7 @@ class SystemGraph(object):
         for node in self.eval_graph.nodes:
 
             if isinstance(node, VariableNode):
+                self.num_vars += 1
                 # increment id
                 unique_id_num = increment_id(unique_id_num)
 
@@ -214,7 +216,8 @@ class SystemGraph(object):
 
                     if node.promoted_id in self.rep.promoted_to_node:
                         if not isinstance(node.var, (Output, Input)):
-                            if np.array_equal(node.var.val, np.ones(node.var.shape)):
+                            # if np.array_equal(node.var.val, np.ones(node.var.shape)):
+                            if not hasattr(node.var, 'val'):
                                 f.write(f'\tWARNING: this declared variable is not a promotion or connection target with a value being set.\n')
                             else:
                                 f.write(f'\tWARNING: this declared variable is not a promotion or connection. \n')
@@ -287,6 +290,7 @@ class SystemGraph(object):
             'outputs': {},
             'leaf_start': {},
         }
+        num_vars_allocated = 0
 
         # Loop through sorted graph
         for node in nx.topological_sort(self.eval_graph):
@@ -294,15 +298,39 @@ class SystemGraph(object):
             if not isinstance(node, OperationNode):
                 # If variable, set state initial value given by user
                 csdl_node = node.var
+                # print(node.promoted_id, csdl_node.shape)
 
-                if isinstance(csdl_node.val, np.ndarray):
-                    csdl_node.val = csdl_node.val.astype('float64')
-                    if isinstance(csdl_node.val, np.matrix):
-                        csdl_node.val = np.asarray(csdl_node.val).astype('float64')
-                state_vals[node.id] = csdl_node.val
-
+                if hasattr(csdl_node, 'val'):
+                    # print('allocated')
+                    # print(csdl_node.name, csdl_node.val)
+                    if isinstance(csdl_node.val, np.ndarray):
+                        csdl_node.val = csdl_node.val.astype('float64')
+                        if isinstance(csdl_node.val, np.matrix):
+                            csdl_node.val = np.asarray(csdl_node.val).astype('float64')
+                    state_vals[node.id] = csdl_node.val
+                    num_vars_allocated += 1
+                else:
+                    # print('not allocated')
+                    # state_vals[node.id] = np.ones(csdl_node.shape)
+                    pass
                 promoted_id = node.promoted_id
 
+                if self.eval_graph.in_degree(node) == 0:
+                    # print(csdl_node.name, csdl_node.val)
+                    if not hasattr(csdl_node, 'val'):
+                        print(node.id, csdl_node.name)
+                        raise KeyError('no in val')
+
+                if self.eval_graph.out_degree(node) == 0:
+
+                    if node.id not in state_vals:
+                        state_vals[node.id] = np.ones(csdl_node.shape)
+                        num_vars_allocated += 1
+
+                    # if not hasattr(csdl_node, 'val'):
+                    #     print(node.id, csdl_node.name)
+                    #     raise KeyError('no out val')
+                    
                 if isinstance(csdl_node, Output):
                     if node.name[0] != '_':
                         if promoted_id in self.promoted_to_unique:
@@ -382,6 +410,15 @@ class SystemGraph(object):
                     eval_block.write(back_operation.unreshape_block)
                 # +=+=+=+=+=+=+=+=+=+=+=+=+==+= end evaluation procedure +=+=+=+=+=+=+=+=+=+=+=+=+=+=
 
+                # If operation is nonlinear, store all predecessors. 
+                # if 1:
+                if not back_operation.linear:
+                    for pred in self.eval_graph.predecessors(node):
+                        if pred.id not in state_vals:
+                            state_vals[pred.id] = np.ones(pred.var.shape)
+                            num_vars_allocated += 1
+
+        print(f'num_vars_allocated: {num_vars_allocated} (out of {(self.num_vars)})')
         return eval_block, preeval_vars, state_vals, variable_info
 
     # @profile
@@ -401,9 +438,12 @@ class SystemGraph(object):
         # list of output ids and input ids to get derivatives of.
         output_ids = to_list(output_ids)
         input_ids = to_list(input_ids)
+        num_output_vars = len(output_ids)
+        total_output_size = 0
 
         # dictionary of ALL predecessor nodes of inputs
         # input_ancestors: input id --> set(nodes)
+        # TODO: this is actually O(n*|input_ids|) not O(n)... fix later?
         input_ancestors = {}
         for input_id in input_ids:
             input_ancestors[input_id] = set(nx.ancestors(self.rev_graph, self.unique_to_node[input_id]))
@@ -413,7 +453,9 @@ class SystemGraph(object):
         for out_id_temp in output_ids:
             output_node = self.unique_to_node[out_id_temp]
             output_lang_name_temp = output_node.name
-
+            output_shape = output_node.var.shape
+            output_size = np.prod(output_shape)
+            total_output_size += output_size
             if len(f'{output_lang_name_temp}-->') > max_outstr_len:
                 max_outstr_len = len(f'{output_lang_name_temp}-->')
 
@@ -432,6 +474,13 @@ class SystemGraph(object):
 
         # accumulation operations
         prerev_vars['DIAG_MULT'] = diag_mult
+
+        # Statistics of derivative
+        stats = {}
+        stats['num_linear_solves'] = 0 # Number of linear solves used for implicit operations
+        stats['percent_saved_accumulation'] = 0 # % of operations saved compared to standard reverse mode 
+        stats['percent_sparse'] = 0 # % of operations with sparse partial Jacobians
+        num_ops_derivs = 0
 
         # Keep track of which partials have already been computed.
         # We only need to compute partial jacobians once no matter how many
@@ -455,6 +504,7 @@ class SystemGraph(object):
             output_lang_name = output_node.name
             output_shape = output_node.var.shape
             output_size = np.prod(output_shape)
+            stats_num_operations_accumulated = 0 # number of operations used for accumulation (will increase through algorithm)
 
             # list of initialized paths.
             initialized_paths = set()
@@ -539,6 +589,7 @@ class SystemGraph(object):
 
                 # if program reaches here, middle_operation has been fully visited so we now process it
                 processed_operations.add(middle_operation)
+                stats_num_operations_accumulated += 1
 
                 # cool print statements:
                 current_op_num += 1
@@ -598,20 +649,25 @@ class SystemGraph(object):
 
                         # compute_partials for each input and output
                         is_sparse_jac = get_operation_sparsity(backend_op, self.sparsity_type)
+                        
+                        # Only for statistics
+                        if is_sparse_jac:
+                            stats['percent_sparse'] += 1
+                        num_ops_derivs += 1
 
                         # PRINT:
-                        # pred_size = 0
-                        # for predecessor in self.rev_graph.predecessors(middle_operation):
-                        #     if np.prod(predecessor.var.shape) > pred_size:
-                        #         pred_size = np.prod(predecessor.var.shape)
-                        # succ_size = 0
-                        # for successor in self.rev_graph.successors(middle_operation):
-                        #     if np.prod(successor.var.shape) > succ_size:
-                        #         succ_size = np.prod(successor.var.shape)
-                        # if (pred_size > 100 and succ_size > 100) and not is_sparse_jac:
-                        #     print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
-                        # elif (pred_size < 100 and succ_size < 100) and is_sparse_jac:
-                        #     print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
+                        pred_size = 0
+                        for predecessor in self.rev_graph.predecessors(middle_operation):
+                            if np.prod(predecessor.var.shape) > pred_size:
+                                pred_size = np.prod(predecessor.var.shape)
+                        succ_size = 0
+                        for successor in self.rev_graph.successors(middle_operation):
+                            if np.prod(successor.var.shape) > succ_size:
+                                succ_size = np.prod(successor.var.shape)
+                        if (pred_size > 100 and succ_size > 100) and not is_sparse_jac:
+                            print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
+                        elif (pred_size < 100 and succ_size < 100) and is_sparse_jac:
+                            print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
 
                         backend_op.get_partials(partials_dict, partials_block, vars, is_sparse_jac)
 
@@ -674,6 +730,9 @@ class SystemGraph(object):
                                 rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {implicit_out_size}))')
 
                         path_out_names.append(path_out_name)
+
+                    if backend_op in self.all_implicit_operations:
+                        stats['num_linear_solves'] += output_size
 
                     # compute and write to script
                     backend_op.get_accumulation_function(path_in_names, path_out_names, partials_block, vars)
@@ -813,7 +872,9 @@ class SystemGraph(object):
                     rev_block.comment(f'{totals_name} = zero')
                     input_size = np.prod(self.unique_to_node[input_id].var.shape)
                     prerev_vars[totals_name] = np.zeros((output_size, input_size))
-
+            
+            # update stats
+            stats['percent_saved_accumulation'] += (1-stats_num_operations_accumulated/self.num_ops)*(output_size/total_output_size)
             # print statement
             print_loading(
                 out_str,
@@ -821,7 +882,13 @@ class SystemGraph(object):
                 self.num_ops,
                 True)
 
-        return rev_block, prerev_vars
+        # For stats
+        if num_ops_derivs == 0:
+            stats['percent_sparse'] = 0.0
+        else:
+            stats['percent_sparse'] = stats['percent_sparse']/num_ops_derivs
+
+        return rev_block, prerev_vars, stats
 
     def replace_brackets_lang_var_to_rep_var(self, bracket_node):
         # iterate through brackets map to see if there are any matching variables.

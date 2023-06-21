@@ -17,6 +17,7 @@ class ReorderAxesLite(OperationBase):
         op_name = 'reorder_axes'
         name = f'{name}_{op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.linear = True
 
         in_name = operation.dependencies[0].name
         in_shape = operation.dependencies[0].shape

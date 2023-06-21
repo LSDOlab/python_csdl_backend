@@ -39,6 +39,8 @@ class ImplicitSimWrapper(ImplicitWrapperBase):
             # Keep state initial guess for implicit operation
             for state_out in op.outs:
                 if state_out.name == state:
+                    if not hasattr(state_out, 'val'):
+                        state_out.val = np.ones(state_out.shape)
                     state_val = state_out.val
             self.states[state]['initial_val'] = state_val
 

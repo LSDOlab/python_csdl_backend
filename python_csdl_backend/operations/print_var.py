@@ -21,7 +21,7 @@ class PrintVarLite(OperationBase):
         self.in_name = self.operation.dependencies[0].name
         self.out_name = self.operation.dependencies[0].name + '_print'
         self.shape = self.operation.dependencies[0].shape
-        self.val = self.operation.dependencies[0].val
+        # self.val = self.operation.dependencies[0].val
         self.input_size = np.prod(self.operation.dependencies[0].shape)
 
         self.input_name = self.get_input_id(self.in_name)

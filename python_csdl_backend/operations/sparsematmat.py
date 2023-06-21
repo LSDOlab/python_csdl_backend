@@ -17,6 +17,7 @@ class SparsematmatLite(OperationBase):
         op_name = 'sparsematmat'
         name = f'{name}_{op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.linear = True
 
         shape = operation.dependencies[0].shape
         in_name = operation.dependencies[0].name

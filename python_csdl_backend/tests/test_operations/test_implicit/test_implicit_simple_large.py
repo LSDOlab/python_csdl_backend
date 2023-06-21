@@ -139,6 +139,9 @@ if __name__ == '__main__':
     import time
     import matplotlib.pyplot as plt
 
+    test_implicit_simple_large_newton()
+    exit()
+
     def main(model_class, outs, ins, num):
         # CSDL OM
 

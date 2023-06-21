@@ -27,8 +27,8 @@ class CrossLite(OperationBase):
         self.in2_name = operation.dependencies[1].name
         self.out_name = operation.outs[0].name
         self.axis = operation.literals['axis']
-        self.in1_val = operation.dependencies[0].val
-        self.in2_val = operation.dependencies[1].val
+        # self.in1_val = operation.dependencies[0].val
+        # self.in2_val = operation.dependencies[1].val
 
         self.outsize = np.prod(self.shape)
         self.insize = self.outsize

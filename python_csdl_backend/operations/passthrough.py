@@ -16,6 +16,7 @@ class PassthroughLite(OperationBase):
         op_name = 'passthrough'
         name = f'{name} {op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.linear = True
 
         self.input_name = get_only(self.nx_inputs_dict)
         self.output_name = get_only(self.nx_outputs_dict)

@@ -29,11 +29,12 @@ class SingleTensorSumCompLite(OperationBase):
         op_name = 'single_tensor_sum_no_axis'
         name = f'{name} {op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.linear = True
 
         self.in_name = self.get_input_id(operation.dependencies[0].name)
         self.shape = operation.dependencies[0].shape
         self.out_name = self.get_output_id(operation.outs[0].name)
-        self.val = operation.dependencies[0].val
+        # self.val = operation.dependencies[0].val
         self.out_shape = operation.outs[0].shape
 
         self.input_size = np.prod(self.shape)
@@ -62,13 +63,14 @@ class MultipleTensorSumCompLite(OperationBase):
         name = f'{name} {op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
         self.elementwise = True
+        self.linear = True
 
         self.in_names = [self.get_input_id(var.name) for var in operation.dependencies]
         self.shape = operation.dependencies[0].shape
         self.out_name = self.get_output_id(operation.outs[0].name)
         self.out_shape = operation.outs[0].shape
         self.axes = operation.literals['axes']
-        self.vals = [var.val for var in operation.dependencies]
+        # self.vals = [var.val for var in operation.dependencies]
 
         self.input_size = np.prod(self.shape)
 
@@ -100,11 +102,12 @@ class SingleTensorSumCompAxisLite(OperationBase):
         op_name = 'single_tensor_sum_with_axis'
         name = f'{name}_{op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.linear = True
 
         self.in_name = self.get_input_id(operation.dependencies[0].name)
         self.shape = operation.dependencies[0].shape
         self.out_name = self.get_output_id(operation.outs[0].name)
-        self.val = operation.dependencies[0].val
+        # self.val = operation.dependencies[0].val
         self.out_shape_true = operation.outs[0].shape
         self.axes = operation.literals['axes']
 
@@ -150,13 +153,14 @@ class MultipleTensorSumCompAxisLite(OperationBase):
         op_name = 'multiple_tensor_sum_with_axis'
         name = f'{name}_{op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.linear = True
 
         self.in_names = [var.name for var in operation.dependencies]
         self.shape = operation.dependencies[0].shape
         self.out_name = operation.outs[0].name
         self.out_shape = operation.outs[0].shape
         self.axes = operation.literals['axes']
-        self.vals = [var.val for var in operation.dependencies]
+        # self.vals = [var.val for var in operation.dependencies]
 
         output_shape = np.delete(self.shape, self.axes)
         self.output_shape = tuple(output_shape)

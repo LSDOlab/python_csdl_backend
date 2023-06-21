@@ -29,7 +29,7 @@ class VectorizedPNormLite(OperationBase):
         self.in_name = operation.dependencies[0].name
         self.out_name = operation.outs[0].name
         self.pnorm_type = operation.literals['pnorm_type']
-        self.val = operation.dependencies[0].val
+        # self.val = operation.dependencies[0].val
 
     def get_evaluation(self, eval_block, vars):
 
@@ -62,7 +62,7 @@ class VectorizedAxisWisePNormLite(OperationBase):
         self.in_name = operation.dependencies[0].name
         self.out_name = operation.outs[0].name
         self.pnorm_type = operation.literals['pnorm_type']
-        self.val = operation.dependencies[0].val
+        # self.val = operation.dependencies[0].val
         self.axis = operation.literals['axis']
         self.out_shape = tuple(np.delete(operation.dependencies[0].shape, operation.literals['axis']))
 
@@ -120,4 +120,4 @@ class VectorizedAxisWisePNormLite(OperationBase):
             partials_block.write(f'{partial_name}[{row_name},{col_name}] = np.einsum(\'{self.operation}\', {output}**(1 - {self.pnorm_type}), {input}**({self.pnorm_type} - 1)).flatten()')
 
     def determine_sparse(self):
-        return True
+        return False

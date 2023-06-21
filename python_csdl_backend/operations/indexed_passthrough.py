@@ -19,6 +19,7 @@ class IndexedPassthroughLite(OperationBase):
         op_name = 'indexed_passthrough'
         name = f'{name}_{op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.linear = True
 
         self.out_name = get_only(self.nx_outputs_dict)
         self.out_var = operation.outs[0]
@@ -71,7 +72,7 @@ class IndexedPassthroughLite(OperationBase):
     def determine_sparse(self):
         # return True
         out_size = np.prod(self.out_shape)
-        if out_size < 50:
+        if out_size < 100:
             return False
 
         number_of_indices = 0
