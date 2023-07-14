@@ -40,6 +40,7 @@ def test_sum_mult_tensor():
     m = 6
     p = 7
     q = 10
+    np.random.seed(10)
 
     v1 = np.random.rand(n * m * p * q).reshape((n, m, p, q))
     v2 = np.random.rand(n * m * p * q).reshape((n, m, p, q))
@@ -64,6 +65,7 @@ def test_sum_mult_axis_tensor():
     m = 6
     p = 7
     q = 10
+    np.random.seed(10)
 
     v1 = np.random.rand(n * m * p * q).reshape((n, m, p, q))
     v2 = np.random.rand(n * m * p * q).reshape((n, m, p, q))

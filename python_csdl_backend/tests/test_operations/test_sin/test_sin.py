@@ -1,6 +1,5 @@
-from python_csdl_backend.tests.create_single_test import run_test
 import csdl
-import numpy as np
+from pytest_easyMPI import mpi_parallel
 
 
 class SinSample(csdl.Model):
@@ -9,6 +8,8 @@ class SinSample(csdl.Model):
         self.parameters.declare('scalability_param')
 
     def define(self):
+        import numpy as np
+
         scalability_param = self.parameters['scalability_param']
 
         x = self.create_input('x', val=2*np.ones(scalability_param))
@@ -19,6 +20,9 @@ class SinSample(csdl.Model):
 
 
 def test_sin():
+    from python_csdl_backend.tests.create_single_test import run_test
+    import numpy as np
+
     nn = 1
     vals_dict = {'y': np.sin(2*np.ones(nn))}
     totals_dict = {('y', 'x'): np.diag(np.cos(2*np.ones(nn)))}
@@ -33,6 +37,9 @@ def test_sin():
 
 
 def test_sin_large():
+    from python_csdl_backend.tests.create_single_test import run_test
+    import numpy as np
+
     nn = (10, 10)
     vals_dict = {'y': np.sin(2*np.ones(nn))}
     totals_dict = {('y', 'x'): np.diag(np.cos(2*np.ones(100)))}
@@ -45,7 +52,7 @@ def test_sin_large():
         vals_dict=vals_dict,
         totals_dict=totals_dict)
 
-
+    
 if __name__ == '__main__':
 
     test_sin()

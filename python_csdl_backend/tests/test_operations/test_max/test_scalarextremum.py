@@ -60,6 +60,18 @@ def test_scalarextremummax():
 
 
 if __name__ == '__main__':
+    # import python_csdl_backend
+    # from mpi4py import MPI
+    # comm = MPI.COMM_WORLD
+    # m = ScalarExtremumMaxSample(scalability_param=1)
+    # sim = python_csdl_backend.Simulator(m, comm = comm, algorithm = 'Sync Points Coarse', display_scripts=1)
+    # sim.run()
+
+    # # print(np.linalg.norm(sim['y']))
+    # # sim.check_partials(compact_print=1)
+    # sim.check_totals(['y_out'], 'x', compact_print=1)
+    test_scalarextremummax()
+    exit()
     import python_csdl_backend
 
     class ScalarExtremumMaxSample2(csdl.Model):

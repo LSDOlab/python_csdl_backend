@@ -132,102 +132,120 @@ def test_implicit_simple_large_nlbgs():
         )
 
 if __name__ == '__main__':
-    from csdl_om import Simulator as OmSimulator
-    from python_csdl_backend import Simulator as LiteSimulator
-    import pytest
-    import numpy as np
-    import time
-    import matplotlib.pyplot as plt
+    nn = 3
+    import csdl
+    model = Implicit(num_nodes1=nn, num_nodes2=nn, num_nodes3=nn, nlsolver='bracket')
 
-    def main(model_class, outs, ins, num):
-        # CSDL OM
+    import python_csdl_backend
+    sim = python_csdl_backend.Simulator(model, checkpoints=1, save_vars='all',)
+    sim.run()
+    rep = csdl.GraphRepresentation(model)
+    rep.visualize_graph()
 
-        model = model_class(num_nodes1=num, num_nodes2=1, num_nodes3=1)
-        sim_om = OmSimulator(model, mode='rev')
-        # sim_om.visualize_implementation()
+    print(sim['u'])
+    print(sim['f'])
+    print(sim['x'])
 
-        start = time.time()
-        sim_om.run()
-        to = time.time() - start
+    # sim.check_totals(of = ['u', 'f',  'x'], wrt = ['d', 'b', 'c'])
+    sim.check_partials()
 
-        start = time.time()
-        x1 = sim_om.prob.compute_totals(outs, ins)
-        tot = time.time() - start
 
-        # CSDL LITE
-        sim_lite = LiteSimulator(model)
-        sim_lite.eval_instructions.save()
-        # sim_lite.visualize_implementation()
+#     from csdl_om import Simulator as OmSimulator
+#     from python_csdl_backend import Simulator as LiteSimulator
+#     import pytest
+#     import numpy as np
+#     import time
+#     import matplotlib.pyplot as plt
 
-        # import cProfile
-        # profiler = cProfile.Profile()
-        # profiler.enable()
+#     def main(model_class, outs, ins, num):
+#         # CSDL OM
 
-        start = time.time()
-        sim_lite.run()
-        tl = time.time() - start
+#         model = model_class(num_nodes1=num, num_nodes2=1, num_nodes3=1)
+#         sim_om = OmSimulator(model, mode='rev')
+#         # sim_om.visualize_implementation()
 
-        sim_lite.generate_totals(outs, ins)
-        start = time.time()
-        x = sim_lite.compute_totals(outs, ins)
-        tlt = time.time() - start
+#         start = time.time()
+#         sim_om.run()
+#         to = time.time() - start
 
-        for key in x:
-            print(key)
-            print(np.linalg.norm(x[key].A))
-            print(np.linalg.norm(x1[key]))
+#         start = time.time()
+#         x1 = sim_om.prob.compute_totals(outs, ins)
+#         tot = time.time() - start
 
-        # profiler.disable()
-        # profiler.dump_stats('output')
-        return tl, to, tlt, tot
+#         # CSDL LITE
+#         sim_lite = LiteSimulator(model)
+#         sim_lite.eval_instructions.save()
+#         # sim_lite.visualize_implementation()
 
-    # num_vec = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    # num_vec = [1, 2, 3, 4, 5, 6, 7]
-    num_vec = [1, 2, 3, 4, 5, 10, 15, 20, 30, 50, 60, 100, 200, 400,  600,  1000,  2000]
-    num_vec = [1, 2, 3, 4, 5, 10, 15, 20, 30, 50, 60, 100, 200]
+#         # import cProfile
+#         # profiler = cProfile.Profile()
+#         # profiler.enable()
 
-    tl_vec = []
-    to_vec = []
-    p_vec = []
+#         start = time.time()
+#         sim_lite.run()
+#         tl = time.time() - start
 
-    tlt_vec = []
-    tot_vec = []
-    pt_vec = []
-    for num in num_vec:
-        tl, to, tlt, tot = main(Implicit, ['f'], ['a', 'b', 'c'], num)
-        tl_vec.append(tl)
-        to_vec.append(to)
-        p_vec.append(to/tl)
+#         sim_lite.generate_totals(outs, ins)
+#         start = time.time()
+#         x = sim_lite.compute_totals(outs, ins)
+#         tlt = time.time() - start
 
-        tlt_vec.append(tlt)
-        tot_vec.append(tot)
-        pt_vec.append(tot/tlt)
-        print('================', num, '================')
+#         for key in x:
+#             print(key)
+#             print(np.linalg.norm(x[key].A))
+#             print(np.linalg.norm(x1[key]))
 
-    plt.figure()
-    plt.loglog(num_vec, tl_vec)
-    plt.loglog(num_vec, to_vec)
-    plt.grid()
-    plt.xlabel('size')
-    plt.ylabel('run time(sec)')
+#         # profiler.disable()
+#         # profiler.dump_stats('output')
+#         return tl, to, tlt, tot
 
-    plt.figure()
-    plt.loglog(num_vec, p_vec)
-    plt.grid()
-    plt.xlabel('size')
-    plt.ylabel('run (om time)/(lite time)')
+#     # num_vec = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+#     # num_vec = [1, 2, 3, 4, 5, 6, 7]
+#     num_vec = [1, 2, 3, 4, 5, 10, 15, 20, 30, 50, 60, 100, 200, 400,  600,  1000,  2000]
+#     num_vec = [1, 2, 3, 4, 5, 10, 15, 20, 30, 50, 60, 100, 200]
 
-    plt.figure()
-    plt.loglog(num_vec, tlt_vec)
-    plt.loglog(num_vec, tot_vec)
-    plt.grid()
-    plt.xlabel('size')
-    plt.ylabel('total time(sec)')
+#     tl_vec = []
+#     to_vec = []
+#     p_vec = []
 
-    plt.figure()
-    plt.loglog(num_vec, pt_vec)
-    plt.grid()
-    plt.xlabel('size')
-    plt.ylabel('total (om time)/(lite time)')
+#     tlt_vec = []
+#     tot_vec = []
+#     pt_vec = []
+#     for num in num_vec:
+#         tl, to, tlt, tot = main(Implicit, ['f'], ['a', 'b', 'c'], num)
+#         tl_vec.append(tl)
+#         to_vec.append(to)
+#         p_vec.append(to/tl)
 
-    plt.show()
+#         tlt_vec.append(tlt)
+#         tot_vec.append(tot)
+#         pt_vec.append(tot/tlt)
+#         print('================', num, '================')
+
+#     plt.figure()
+#     plt.loglog(num_vec, tl_vec)
+#     plt.loglog(num_vec, to_vec)
+#     plt.grid()
+#     plt.xlabel('size')
+#     plt.ylabel('run time(sec)')
+
+#     plt.figure()
+#     plt.loglog(num_vec, p_vec)
+#     plt.grid()
+#     plt.xlabel('size')
+#     plt.ylabel('run (om time)/(lite time)')
+
+#     plt.figure()
+#     plt.loglog(num_vec, tlt_vec)
+#     plt.loglog(num_vec, tot_vec)
+#     plt.grid()
+#     plt.xlabel('size')
+#     plt.ylabel('total time(sec)')
+
+#     plt.figure()
+#     plt.loglog(num_vec, pt_vec)
+#     plt.grid()
+#     plt.xlabel('size')
+#     plt.ylabel('total (om time)/(lite time)')
+
+#     plt.show()

@@ -72,6 +72,7 @@ class MatmatSample2(csdl.Model):
 
 
 def test_matmat2():
+    np.random.seed(10)
     in_val1 = np.random.rand(20, 20)
     in_val2 = np.random.rand(20, 20)
     val = in_val1 @ in_val2

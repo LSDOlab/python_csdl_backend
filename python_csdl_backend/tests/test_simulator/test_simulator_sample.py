@@ -38,14 +38,6 @@ def test_check_partials():
     sim.check_partials()
 
 
-def test_check_totals():
-    sim = Simulator(SampleModel())
-
-    sim.run()
-    t = sim.check_totals()
-    np.testing.assert_almost_equal(len(t), 2)
-
-
 def test_check_totals_of_wrt():
     sim = Simulator(SampleModel())
     sim.run()

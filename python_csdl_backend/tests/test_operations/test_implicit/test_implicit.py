@@ -95,7 +95,19 @@ def test_implicit_nlbgs():
 
 if __name__ == '__main__':
     import python_csdl_backend
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
 
-    sim = python_csdl_backend.Simulator(Implicit())
-    sim.eval_instructions.script.save()
+    sim = python_csdl_backend.Simulator(Implicit(nlsolver='newton'),comm = comm, algorithm = 'Sync Points Coarse', checkpoints=1)
+    # sim = python_csdl_backend.Simulator(Implicit(nlsolver='newton'),comm = comm, algorithm = 'Sync Points Coarse')
+
+    # sim.eval_instructions.script.save()
     sim.run()
+    # totals = sim.compute_totals(['ax2_out', 'x'], ['a', 'b', 'c'])
+    # totals = sim.compute_totals(['x'], ['a'])
+    totals = sim.check_totals(['ax2'], ['a'])
+    # totals = sim.check_partials()
+    
+    for key in totals:
+        print(key, totals[key])
+    # sim.check_partials()

@@ -44,3 +44,16 @@ def test_cos_large():
         name='test_cos_large',
         vals_dict=vals_dict,
         totals_dict=totals_dict)
+
+
+if __name__ == '__main__':
+    import python_csdl_backend
+
+    import cProfile
+    profiler = cProfile.Profile()
+    profiler.enable()
+    sim = python_csdl_backend.Simulator(CosSample(scalability_param=2))
+    sim.run()
+    sim.check_partials()
+    profiler.disable()
+    profiler.dump_stats('output')

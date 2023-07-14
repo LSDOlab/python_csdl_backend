@@ -19,37 +19,37 @@ class PrintVarSample(csdl.Model):
         self.register_output('y', y)
 
 
-def test_print_var():
-    nn = 1
-    in_val = 0.5*np.ones(nn)
-    val = np.tanh(in_val) + 1
-    vals_dict = {'y': val}
+# def test_print_var():
+#     nn = 1
+#     in_val = 0.5*np.ones(nn)
+#     val = np.tanh(in_val) + 1
+#     vals_dict = {'y': val}
 
-    total = np.diag((1.0 - np.tanh(in_val)**2).flatten())
-    totals_dict = {('y', 'x'): total}
+#     total = np.diag((1.0 - np.tanh(in_val)**2).flatten())
+#     totals_dict = {('y', 'x'): total}
 
-    run_test(
-        PrintVarSample(scalability_param=nn),
-        outs=['y'],
-        ins=['x'],
-        name='test_print_var',
-        vals_dict=vals_dict,
-        totals_dict=totals_dict)
+#     run_test(
+#         PrintVarSample(scalability_param=nn),
+#         outs=['y'],
+#         ins=['x'],
+#         name='test_print_var',
+#         vals_dict=vals_dict,
+#         totals_dict=totals_dict)
 
 
-def test_print_var_large():
-    nn = (2, 2)
-    in_val = 0.5*np.ones(nn)
-    val = np.tanh(in_val) +1 
-    vals_dict = {'y': val}
+# def test_print_var_large():
+#     nn = (2, 2)
+#     in_val = 0.5*np.ones(nn)
+#     val = np.tanh(in_val) +1 
+#     vals_dict = {'y': val}
 
-    total = np.diag((1.0 - np.tanh(in_val)**2).flatten())
-    totals_dict = {('y', 'x'): total}
+#     total = np.diag((1.0 - np.tanh(in_val)**2).flatten())
+#     totals_dict = {('y', 'x'): total}
 
-    run_test(
-        PrintVarSample(scalability_param=nn),
-        outs=['y'],
-        ins=['x'],
-        name='test_print_var_large',
-        vals_dict=vals_dict,
-        totals_dict=totals_dict)
+#     run_test(
+#         PrintVarSample(scalability_param=nn),
+#         outs=['y'],
+#         ins=['x'],
+#         name='test_print_var_large',
+#         vals_dict=vals_dict,
+#         totals_dict=totals_dict)

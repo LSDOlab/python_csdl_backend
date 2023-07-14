@@ -27,3 +27,6 @@ def test_scaler():
     np.testing.assert_almost_equal(sim.obj['scaler'], np.ones((1,))*10.0)
     np.testing.assert_almost_equal(sim.get_constraints_metadata()['z1']['scaler'], np.ones((3, 2))*(11.0))
     np.testing.assert_almost_equal(sim.get_constraints_metadata()['z1']['lower'], np.ones((3, 2))*(-55.0))
+
+if __name__ == "__main__":
+    test_scaler()
