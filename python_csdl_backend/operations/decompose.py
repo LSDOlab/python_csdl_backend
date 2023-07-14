@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.sparse_utils import sparse_matrix
@@ -24,7 +24,8 @@ class DecomposeLite(OperationBase):
         self.invar = self.nx_inputs_dict[self.in_name].var
         self.src_indices = self.operation.src_indices
         self.shape = self.invar.shape
-        self.val = self.invar.val
+        # self.val = self.invar.val
+        self.linear = True
 
     def get_evaluation(self, eval_block, vars):
 
@@ -43,7 +44,7 @@ class DecomposeLite(OperationBase):
             # eval_block.write(f'{name_id} = {self.in_name}.flatten()[{src_indices_name}]')
             # eval_block.write(f'{name_id} = {name_id}.reshape({shape})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         for key_tuple in partials_dict:
             input = key_tuple[1].id
@@ -59,14 +60,29 @@ class DecomposeLite(OperationBase):
                 if output == key.name:
                     temp = self.src_indices[key]
 
-            rows = np.arange(len(temp))
-            cols = temp
-            data = np.ones(sizeout)
-
-            if is_sparse_jac:
-                vars[partial_name] = sp.csc_matrix((data, (rows, cols)), shape=(sizeout, size))
+            if lazy:
+                cols_name = '_cols'+partial_name
+                vars[cols_name] = temp
+                
+                partials_block.write(f'rows = np.arange({len(temp)})')
+                partials_block.write(f'data = np.ones({sizeout})')
+                
+                if is_sparse_jac:
+                    partials_block.write(f'{partial_name} = sp.csc_matrix((data, (rows, {cols_name})), shape=({sizeout}, {size}))')
+                else:
+                    partials_block.write(f'{partial_name} = sp.csc_matrix((data, (rows, {cols_name})), shape=({sizeout}, {size})).toarray()')
+                partials_block.write(f'del rows')
+                partials_block.write(f'del data')
+            
             else:
-                vars[partial_name] = sp.csc_matrix((data, (rows, cols)), shape=(sizeout, size)).toarray()
+                rows = np.arange(len(temp))
+                cols = temp
+                data = np.ones(sizeout)
+
+                if is_sparse_jac:
+                    vars[partial_name] = sp.csc_matrix((data, (rows, cols)), shape=(sizeout, size))
+                else:
+                    vars[partial_name] = sp.csc_matrix((data, (rows, cols)), shape=(sizeout, size)).toarray()
 
     def determine_sparse(self):
         # return True

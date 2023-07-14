@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 import numpy as np
@@ -24,7 +24,7 @@ class ReorderAxesLite(OperationBase):
         out_shape = operation.outs[0].shape
         operation_literal = operation.literals['operation']
         new_axes_locations = operation.literals['new_axes_locations']
-        val = operation.dependencies[0].val
+        # val = operation.dependencies[0].val
 
         self.out_id = self.get_output_id(out_name)
         self.in_id = self.get_input_id(in_name)
@@ -48,6 +48,7 @@ class ReorderAxesLite(OperationBase):
 
         self.out_size = np.prod(out_shape)
         self.in_size = np.prod(in_shape)
+        self.linear = True
 
     def get_evaluation(self, eval_block, vars):
 
@@ -55,7 +56,7 @@ class ReorderAxesLite(OperationBase):
         vars[new_axes_location_name] = self.new_axes_locations
         eval_block.write(f'{self.out_id} = np.transpose({self.in_id}, {new_axes_location_name})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         key_tuple = get_only(partials_dict)
         partial_name = partials_dict[key_tuple]['name']

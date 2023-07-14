@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 import numpy as np
@@ -20,12 +20,13 @@ class PassthroughLite(OperationBase):
         self.input_name = get_only(self.nx_inputs_dict)
         self.output_name = get_only(self.nx_outputs_dict)
         self.input_size = np.prod(self.nx_inputs_dict[self.input_name].var.shape)
+        self.linear = True
 
     def get_evaluation(self, eval_block, vars):
 
         eval_block.write(f'{self.output_name} = {self.input_name}')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         key_tuple = get_only(partials_dict)
         input = key_tuple[1]

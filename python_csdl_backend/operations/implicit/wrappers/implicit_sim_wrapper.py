@@ -13,7 +13,7 @@ class ImplicitSimWrapper(ImplicitWrapperBase):
         expose: List[str] = op.expose  # EXPOSED VARIABLES
 
         # create simulator of implicit model
-        self.sim = Simulator(op._model)
+        self.sim = Simulator(op.rep)
 
         # dictionary of information on state
         # Try to keep as many things out of memory after init

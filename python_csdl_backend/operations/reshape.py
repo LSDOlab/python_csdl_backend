@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.sparse_utils import sparse_matrix
@@ -30,13 +30,14 @@ class ReshapeLite(OperationBase):
         self.shape = self.invar.shape
         self.outshape = self.outvar.shape
         self.size = np.prod(self.shape)
+        self.linear = True
 
-        self.val = self.invar.val
+        # self.val = self.invar.val
 
     def get_evaluation(self, eval_block, vars):
         eval_block.write(f'{self.out_name} = {self.in_name}.reshape({self.outshape})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         key_tuple = get_only(partials_dict)
         partial_name = partials_dict[key_tuple]['name']
@@ -48,7 +49,11 @@ class ReshapeLite(OperationBase):
 
         # NEW:
         # if elementwise, pass in 1-d diagonal
-        vars[partial_name] = np.ones(self.size)
+
+        if lazy:
+            partials_block.write(f'{partial_name} = np.ones({self.size})')
+        else:
+            vars[partial_name] = np.ones(self.size)
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.size)

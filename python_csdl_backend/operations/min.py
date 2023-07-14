@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.sparse_utils import get_sparsity
@@ -32,7 +32,7 @@ class AxisMinLite(OperationBase):
         out_name = operation.outs[0].name
         self.out_id = self.get_output_id(out_name)
         self.rho = operation.literals['rho']
-        self.val = operation.dependencies[0].val
+        # self.val = operation.dependencies[0].val
 
         total_rank = len(shape)
         if axis < 0:
@@ -82,7 +82,7 @@ class AxisMinLite(OperationBase):
         vars[self.name] = compute_min
         eval_block.write(f'{self.out_id} = {self.name}({self.in_id})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         key_tuple = get_only(partials_dict)
         input = key_tuple[1].id
@@ -146,7 +146,7 @@ class ElementwiseMinLite(OperationBase):
         self.out_name = operation.outs[0].name
         self.out_id = self.get_output_id(self.out_name)
         self.rho = operation.literals['rho']
-        self.vals = [var.val for var in operation.dependencies]
+        # self.vals = [var.val for var in operation.dependencies]
 
         r_c = np.arange(np.prod(self.shape))
         self.rows = self.cols = r_c
@@ -164,7 +164,7 @@ class ElementwiseMinLite(OperationBase):
             eval_block.write(f'arg += np.exp({self.rho} * (-{in_name} - fmax))')
         eval_block.write(f'{self.out_id} = -(fmax + 1. / {self.rho} * np.log(arg))')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         row_name = self.name+'_rows'
         col_name = self.name+'_cols'

@@ -2,6 +2,70 @@
 
 Repository for new CSDL backend.
 
+# Changelog
+- Added optional automatic CPU parallelization using MPI.
+    -
+  - Performs static list scheduling that generates blocking MPI code for model evaluation and derivatives. May or may not improve performance depending on model structure.
+  - To run without parallelization (same as before):
+
+    ```Python
+    import csdl
+    import python_csdl_backend
+    sim = python_csdl_backend.Simulator(Sample())
+    ```
+    Terminal:
+    ```Bash
+    python sample.py
+    ```
+  - To run with parallelization (**new**):
+    ```Python
+    import csdl
+    import python_csdl_backend
+    from mpi4py import MPI # conda install mpi4py
+    comm = MPI.COMM_WORLD
+    sim = python_csdl_backend.Simulator(Sample(), comm = comm)
+    ```
+    Terminal:
+    ```Bash
+    mpirun -n {number of processors} python sample.py
+    ```
+- Added optional automatic checkpointing for adjoint computation.
+    -
+  - Using checkpointing can reduce peak memory usage but can be ~2x slower than without checkpointing.
+  - To compute derivatives using checkpointing, specify additional arguments to `Simulator` constructor:
+    ```Python
+    import csdl
+    import python_csdl_backend
+    sim = python_csdl_backend.Simulator(
+        Sample(),
+        checkpoints: bool = True, # Required
+        save_vars: set() = {'sample_model.variable_of_interest'}, # Optional
+        checkpoint_stride: int = 150_000_000, # Optional
+    )
+    ```
+  - `save_vars`: Checkpointing may delete variables of interest during computation which can prevent postprocessing (printing/plotting values after computation). Specify names of variables you wish to permanently allocate memory for in `save_vars`. Has no effect when `checkpoints = False`.
+  - `checkpoint_stride`: Rough estimate of how large a checkpoint interval is in bytes. If left empty, a stride is automatically chosen.
+  - When `checkpoints = True`, additional memory-saving measures are performed such as lazy evaluation of linear partial derivatives as opposed to pre-computation.    
+
+- Other
+    - 
+    - Visualize checkpoints and parallelization: 
+        ```Python
+        python_csdl_backend.Simulator(Sample(), visualize_schedule = True)
+        ```
+    - Significantly reduced memory usage for derivative computation (even without checkpointing) by deallocating partial derivatives and propagated adjoints as they are processed. 
+        - **May result in reduced performance for small models compared to previous version.**
+    - Added new tests with more complicated models. 
+        - Run parallel tests using (in root directory):
+            ```Bash
+            mpirun -n {number of processors} pytest
+            ```
+        - Also tests now verify each model with:
+            - [ ] checkpointing, [ ] parallelization (previous implementation)
+            - [x] checkpointing, [ ] parallelization
+            - [ ] checkpointing, [x] parallelization
+            - [x] checkpointing, [x] parallelization
+
 # Installation
 
 Install with `pip install -e .` in root directory. run `pytest` in root directory.

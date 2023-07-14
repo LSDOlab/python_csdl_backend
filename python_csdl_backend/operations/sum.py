@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.sparse_utils import sparse_matrix, get_sparsity, SPARSITY_CUTOFF
@@ -33,7 +33,7 @@ class SingleTensorSumCompLite(OperationBase):
         self.in_name = self.get_input_id(operation.dependencies[0].name)
         self.shape = operation.dependencies[0].shape
         self.out_name = self.get_output_id(operation.outs[0].name)
-        self.val = operation.dependencies[0].val
+        # self.val = operation.dependencies[0].val
         self.out_shape = operation.outs[0].shape
 
         self.input_size = np.prod(self.shape)
@@ -42,7 +42,7 @@ class SingleTensorSumCompLite(OperationBase):
 
         eval_block.write(f'{self.out_name} = np.sum({self.in_name}).reshape({self.out_shape})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         key_tuple = get_only(partials_dict)
         partial_name = partials_dict[key_tuple]['name']
@@ -68,7 +68,7 @@ class MultipleTensorSumCompLite(OperationBase):
         self.out_name = self.get_output_id(operation.outs[0].name)
         self.out_shape = operation.outs[0].shape
         self.axes = operation.literals['axes']
-        self.vals = [var.val for var in operation.dependencies]
+        # self.vals = [var.val for var in operation.dependencies]
 
         self.input_size = np.prod(self.shape)
 
@@ -80,7 +80,7 @@ class MultipleTensorSumCompLite(OperationBase):
                 continue
             eval_block.write(f'+ {in_name}', linebreak=False)
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         for key_tuple in partials_dict:
             partial_name = partials_dict[key_tuple]['name']
@@ -104,7 +104,7 @@ class SingleTensorSumCompAxisLite(OperationBase):
         self.in_name = self.get_input_id(operation.dependencies[0].name)
         self.shape = operation.dependencies[0].shape
         self.out_name = self.get_output_id(operation.outs[0].name)
-        self.val = operation.dependencies[0].val
+        # self.val = operation.dependencies[0].val
         self.out_shape_true = operation.outs[0].shape
         self.axes = operation.literals['axes']
 
@@ -119,7 +119,7 @@ class SingleTensorSumCompAxisLite(OperationBase):
 
         eval_block.write(f'{self.out_name} = np.sum({self.in_name}, axis = {self.axes}).reshape({self.out_shape_true})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         key_tuple = get_only(partials_dict)
         input = key_tuple[1]
@@ -156,7 +156,8 @@ class MultipleTensorSumCompAxisLite(OperationBase):
         self.out_name = operation.outs[0].name
         self.out_shape = operation.outs[0].shape
         self.axes = operation.literals['axes']
-        self.vals = [var.val for var in operation.dependencies]
+        # self.vals = [var.val for var in operation.dependencies]
+        self.linear = True
 
         output_shape = np.delete(self.shape, self.axes)
         self.output_shape = tuple(output_shape)
@@ -180,7 +181,7 @@ class MultipleTensorSumCompAxisLite(OperationBase):
         for i in range(1, self.num_inputs):
             eval_block.write(f'{self.out_id} += np.sum({self.in_ids[i]}, axis={self.axes})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         for key_tuple in partials_dict:
             partial_name = partials_dict[key_tuple]['name']

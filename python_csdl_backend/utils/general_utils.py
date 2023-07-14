@@ -4,15 +4,15 @@ import numpy as np
 # from csdl.core.input import Input
 
 
-def to_list(object):
+def to_unique_list(object):
     '''
     'listifies' object.
     '''
 
     if isinstance(object, list):
-        return object
+        return sorted([*set(object)])
     if isinstance(object, tuple):
-        return object
+        return sorted([*set(object)])
     else:
         return [object]
 
@@ -38,12 +38,15 @@ def get_deriv_name(of, wrt, partials=True):
         return f'd{of}_d{wrt}'
 
 
-def get_path_name(var):
+def get_path_name(var, out_id = None):
     '''
     get the path name for code generation
     '''
-    return f'path_to_{var}'
 
+    if out_id is None:
+        return f'path_to_{var}'
+    else:
+        return f'path_from_{out_id}_to_{var}'
 
 def get_csdl_type_string(csdl_node):
 
@@ -133,3 +136,49 @@ def set_scaler_array(
         return_array = np.ones(shape)*scaler
 
     return return_array
+
+def analyze_dict_memory(var_dict, name):
+    import scipy.sparse as sp
+    import sys
+    total_size = 0
+    total_size_dict = {
+        'partial matrices': 0 ,
+        '_coeff_temp': 0,
+        'states': 0,
+        'adjoints': 0,
+        'other': 0,
+    }
+    for key in var_dict:
+        if var_dict[key] is not None:
+            var = var_dict[key]
+            bytesize = 0
+            vartype = type(var)
+
+            # Estimate memory cost of each variable
+            if sp.issparse(var):
+                vartype = 'sparse'
+                bytesize = var.data.nbytes
+                total_size += bytesize
+            elif isinstance(var, np.ndarray):
+                vartype = 'dense'
+                bytesize = var.nbytes
+                total_size += bytesize
+            elif isinstance(var, tuple):
+                vartype = 'tuple'
+                bytesize = sys.getsizeof(var)
+                total_size += bytesize
+
+            print('\t',key, '\t',vartype, '\t\t',f"{bytesize:,}")
+            if key[0:2] == 'pv':
+                total_size_dict['partial matrices'] += bytesize
+            elif key[0] == 'v':
+                total_size_dict['states'] += bytesize
+            elif 'path_from' in key:
+                total_size_dict['adjoints'] += bytesize
+            elif '_coeff_temp' in key:
+                total_size_dict['_coeff_temp'] += bytesize
+            else:
+                total_size_dict['other'] += bytesize
+    print(name, 'total size', f"{total_size:,}")
+    for var_type in total_size_dict:
+        print('-', f'{var_type} size\t', f"{total_size_dict[var_type]:,}")

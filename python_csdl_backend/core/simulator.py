@@ -1,10 +1,11 @@
 from csdl import SimulatorBase, Model, Operation, ImplicitOperation, GraphRepresentation
 # from csdl.core.output import Output
 # from csdl.core.input import Input
-from python_csdl_backend.core.instructions import Instructions
+from python_csdl_backend.operations.parallel.point_to_point import get_comm_node
+from python_csdl_backend.core.instructions import SingleInstruction
 from python_csdl_backend.core.operation_map import csdl_to_back_map
 from python_csdl_backend.core.systemgraph import SystemGraph
-from python_csdl_backend.utils.general_utils import get_deriv_name, to_list, lineup_string, set_opt_upper_lower, set_scaler_array
+from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, lineup_string, set_opt_upper_lower, set_scaler_array, analyze_dict_memory
 from python_csdl_backend.utils.custom_utils import check_not_implemented_args
 import warnings
 # import time
@@ -17,14 +18,22 @@ import networkx as nx
 
 class Simulator(SimulatorBase):
 
-    def __init__(self,
-                 representation,
-                 mode='rev',
-                 analytics=False,
-                 sparsity='auto',
-                 display_scripts=False,
-                 root=True,
-                 comm = None):
+    # @profile
+    def __init__(
+            self,
+            representation,
+            mode='rev',
+            analytics=False,
+            sparsity='auto',
+            display_scripts=False,
+            root=True,
+            comm = None,
+            algorithm = 'Sync Points Coarse',
+            visualize_schedule = False,
+            checkpoints = False,
+            save_vars = set(), # set of variables to have permanent memory allocation. Only applies for checkpointing
+            checkpoint_stride:int = None
+        ):
         """
         CSDL compiler backend. Evaluates model and derivatives.
 
@@ -49,6 +58,24 @@ class Simulator(SimulatorBase):
             display_scripts: bool
                 (EXPERIMENTAL) saves derivative and evaluation scripts as a python 
                 files for debugging. These files are not used for computation.
+
+            comm: mpi4py communicator
+                (EXPERIMENTAL) MPI communicator. If None, no parallelization is performed.
+
+            algorithm: str
+                (EXPERIMENTAL) Parallelization algorithm. 'Standard Blocking', 'Insertion Blocking', 'Sync Points', 'Sync Points Balance', 'Sync Points Coarse'
+
+            visualize_schedule: bool
+                (EXPERIMENTAL) Visualize the schedule of the parallelization and checkpoints
+            
+            checkpoints: bool
+                (EXPERIMENTAL) Checkpointing
+
+            save_vars: set
+                (EXPERIMENTAL) Set of variables to have permanent memory allocation. Only applies for checkpointing
+
+            checkpoint_stride: int
+                (EXPERIMENTAL) Approximate size of checkpoint intervals. If None, stride is automatically determined.
 
         """
         self.display_scripts = display_scripts
@@ -105,7 +132,15 @@ class Simulator(SimulatorBase):
         # :::::ANALYTICS:::::
 
         # model and graph creation
+        # if comm:
+        # from time_prediction_v5.time_prediction.predict_time import predict_time
+        # predict_time(self.rep)
+
+        from python_csdl_backend.dag_analyzer.utils import predict_time_temp
+        predict_time_temp(self.rep)
+
         self.comm = comm
+        self.checkpoints_bool = checkpoints
         self.system_graph = SystemGraph(
             self.rep,
             mode=mode,
@@ -115,70 +150,147 @@ class Simulator(SimulatorBase):
             constraints=self.cvs,
             opt_bool=self.opt_bool)
         self.system_graph.comm = comm
+        self.system_graph.checkpoints_bool = checkpoints
         # =--=-==-=-=-=-=-=-=-=-=-=-=-=-PARALELIZATION=--=-==-=-=-=-=-=-=-=-=-=-=-=-
-        if comm:
-            from dag_parallelizer import create_csdl_like_graph, assign_costs, Scheduler, rep2parallelizable
-            from dag_parallelizer.schedulers import MTA, MTA_ETA, MTA_PT2PT_INSERTION, MTA_PT2PT_ARB
-            from dag_parallelizer.compiler.generator import code_generator
-            from dag_parallelizer.compiler.run_code import run_code 
-            ccl_graph, str2nodes = rep2parallelizable(
-                comm,
-                self.rep,
-            )
-            COMM_COST = 100
-            OP_COST = 1
-            # Operation settings:
-            VARIABLE_SIZE = 2000
-            COMM_COST = VARIABLE_SIZE/1000
-            # COMM_COST = 0
-            OP_COST = VARIABLE_SIZE/100
+        # if comm:
+        # from python_csdl_backend.dag_analyzer import create_csdl_like_graph, assign_costs, Scheduler, rep2parallelizable
+        # from python_csdl_backend.dag_analyzer.schedulers import MTA, MTA_ETA, MTA_PT2PT_INSERTION, MTA_PT2PT_ARB, SYNC_POINTS, SYNC_POINTS_BALANCE, SYNC_POINTS_COARSE
 
-            # Graph partitioning:
-            # PARTITION_TYPE = MTA()
-            # PARTITION_TYPE = MTA_ETA()
-            # PARTITION_TYPE = MTA_PT2PT_INSERTION()
-            PARTITION_TYPE = MTA_PT2PT_ARB()
+        from python_csdl_backend.dag_analyzer import Scheduler, rep2parallelizable
+        # from python_csdl_backend.dag_analyzer import MTA, MTA_ETA, MTA_PT2PT_INSERTION, MTA_PT2PT_ARB, SYNC_POINTS, SYNC_POINTS_BALANCE, SYNC_POINTS_COARSE
+        # from python_csdl_backend.dag_analyzer import SYNC_POINTS_COARSE
 
-            PROFILE = 0
-            MAKE_PLOTS = 0
-            # MAKE_PLOTS = 1
-            # VISUALIZE_SCHEDULE = 0
-            VISUALIZE_SCHEDULE = 0
+        from python_csdl_backend.dag_analyzer.schedulers.mta.mta import MTA
+        from python_csdl_backend.dag_analyzer.schedulers.mta.mta_eta import MTA_ETA
+        from python_csdl_backend.dag_analyzer.schedulers.mta.mta_pt2pt_insertion import MTA_PT2PT_INSERTION
 
-            # assign_costs(
-            #     ccl_graph,
-            #     communication_cost = COMM_COST,
-            #     operation_cost = OP_COST,
-            # )
+        from python_csdl_backend.dag_analyzer.schedulers.sync_points.sync_points import SYNC_POINTS
+        from python_csdl_backend.dag_analyzer.schedulers.sync_points.sync_points_balance import SYNC_POINTS_BALANCE
+        from python_csdl_backend.dag_analyzer.schedulers.sync_points.sync_points_coarsen import SYNC_POINTS_COARSE
 
-            # Create a schedule from a choice of algorithms
-            scheduler = Scheduler(PARTITION_TYPE, comm)
-            schedule = scheduler.schedule(
-                ccl_graph,
-                profile = PROFILE,
-                create_plots = MAKE_PLOTS,
-                visualize_schedule = VISUALIZE_SCHEDULE,
-            )
+        ccl_graph, str2nodes = rep2parallelizable(
+            self.rep,
+        )
 
-            # print(str2nodes)
-            schedule_new = []
-            for node in schedule:
-                if ('SEND' in node) or ('GET' in node) or ('WAIT' in node) or ('IRECV' in node)  or ('SsENDONLY' in node) or ('irecvwait' in node) or ('W/F' in node):
-                    schedule_new.append(node)
-                else:
-                    schedule_new.append(str2nodes[node])
+        alg_map = {
+            'Standard Blocking': MTA_ETA(),
+            'Insertion Blocking': MTA_PT2PT_INSERTION(),
+            # 'Standard Non-Blocking': MTA_PT2PT_ARB(),
+            'Sync Points': SYNC_POINTS(priority = 'shortest before'),
+            'Sync Points Balance': SYNC_POINTS_BALANCE(priority = 'shortest before'),
+            'Sync Points Coarse': SYNC_POINTS_COARSE(priority = 'shortest before'),
+        }
+        if algorithm not in alg_map:
+            possible_algs = list(alg_map.keys())
+            raise ValueError('algorithm must be specified as one of the following: ' + str(possible_algs))
+        
+        # Graph partitioning:
+        PARTITION_TYPE = alg_map[algorithm]
+        PROFILE = 0
+        MAKE_PLOTS = 0
+        # MAKE_PLOTS = 1
+        VISUALIZE_SCHEDULE = visualize_schedule
+        # VISUALIZE_SCHEDULE = 1
 
-            # for node in schedule_new:
-            #     print(node)
+        # Create a schedule from a choice of algorithms
+        scheduler = Scheduler(PARTITION_TYPE, comm)
+        schedule, raw_variable_owner_map, checkpoint_info = scheduler.schedule(
+            ccl_graph,
+            profile = PROFILE,
+            create_plots = MAKE_PLOTS,
+            visualize_schedule = VISUALIZE_SCHEDULE,
+            checkpoints = self.checkpoints_bool,
+            checkpoint_stride = checkpoint_stride,
+        )
 
-            # print('rank ', comm.rank,  schedule_new)
-            # print('rank ', comm.rank)
-            # for n in schedule_new:
-            #     print(comm.rank, n)
+        # exit(checkpoints)
 
-            self.rep.schedule = schedule_new
+        schedule_new = []
+        for node in schedule:
+            if node in str2nodes:
+                schedule_new.append(str2nodes[node])
+            else:
+                comm_op = get_comm_node(node, comm.rank, self.system_graph)
+                if comm_op is not None:
+                    schedule_new.append(comm_op)
+
+        self.system_graph.variable_owner_map = {}
+        self.system_graph.variable_owner_map_full = {}
+        self.system_graph.checkpoint_data = checkpoint_info
+        
+        if self.comm is not None:
+            this_rank = comm.rank
         else:
-            self.rep.schedule = nx.topological_sort(self.rep.flat_graph)
+            this_rank = 0
+
+        if self.checkpoints_bool:
+            for snapshot in self.system_graph.checkpoint_data:
+                snapshot['rank schedule'] = []
+                for node_str in snapshot['snapshot schedule'][this_rank]:
+                    if node_str in str2nodes:
+                        snapshot['rank schedule'].append(str2nodes[node_str])
+                    else:
+                        comm_op = get_comm_node(node_str, this_rank, self.system_graph)
+                        if comm_op is not None:
+                            snapshot['rank schedule'].append(comm_op)
+                
+                snapshot['rank snapshot'] = set()
+                for node_str in snapshot['snapshot vars']:
+                    snapshot['rank snapshot'].add(str2nodes[node_str])
+
+
+        # print(f'RANK {self.comm.rank}', sorted(str2nodes.keys()))
+
+        # print('CHECKPOINTS DETERMINATION SUCCESS')
+        # self.comm.Abort()
+        # exit('CHECKPOINTS DETERMINATION SUCCESS')
+        # from csdl.rep.variable_node import VariableNode
+        # num_vars = 0
+        # vars_list = []
+        # for node2 in self.system_graph.eval_graph:
+        #     if isinstance(node2, VariableNode):
+        #         num_vars += 1
+        #         vars_list.append(node2.var.name)
+        # num_vars2 = 0
+        # for node2 in ccl_graph:
+        #     if ccl_graph.nodes[node2]['type'] == 'variable':
+        #         num_vars2 += 1
+        # # print(f'RANK {self.comm.rank}', len(raw_variable_owner_map), len(self.system_graph.variable_owner_map), num_vars, num_vars2, len(str2nodes))
+        # print(f'RANK {self.comm.rank}', vars_list)
+        # # print(f'RANK {self.comm.rank}', schedule)
+        
+        for node in raw_variable_owner_map:
+            # print(f'RANK {self.comm.rank}', len(raw_variable_owner_map), len(self.system_graph.variable_owner_map), num_vars, num_vars2, len(str2nodes), node)
+            if node in str2nodes:
+                self.system_graph.variable_owner_map_full[str2nodes[node].id] = raw_variable_owner_map[node]
+                self.system_graph.variable_owner_map[str2nodes[node].id] = list(raw_variable_owner_map[node])[0]
+            else:
+                # print(f'ERROR RANK {self.comm.rank}', len(raw_variable_owner_map), len(self.system_graph.variable_owner_map), num_vars, num_vars2, len(str2nodes), node)
+
+                # time.sleep(1)
+                # self.comm.Abort()
+                print('To debug, make sure that there aren\'t any CSDL variables defined AFTER the scheduling procedure. Recursive simulators and operations must be instantiated before parallelization')
+                raise ValueError(f'node not in str2nodes. Likely that processor 0\'s CSDL model does not match the other processors\' ({self.comm.rank}).')
+
+        if comm is not None:
+            comm.barrier()
+        # exit()
+        del raw_variable_owner_map
+
+        self.rep.schedule = schedule_new
+        # else:
+        #     self.rep.schedule =[]
+        #     self.system_graph.variable_owner_map_full = {}
+        #     self.system_graph.variable_owner_map = {}
+        #     from csdl.rep.variable_node import VariableNode
+
+        #     for node in nx.topological_sort(self.rep.flat_graph):
+
+        #         if isinstance(node, VariableNode):
+        #             self.system_graph.variable_owner_map_full[node.id] = {0}
+        #             self.system_graph.variable_owner_map[node.id] = 0
+        #             continue
+        #         self.rep.schedule.append(node)
         # exit()
         # =--=-==-=-=-=-=-=-=-=-=-=-=-=-PARALELIZATION=--=-==-=-=-=-=-=-=-=-=-=-=-=-
 
@@ -200,30 +312,60 @@ class Simulator(SimulatorBase):
 
         # prepare design variable vectors
         # TODO: uncomment
-        # if self.opt_bool:
-        #     self.process_optimization_vars()
+        if self.opt_bool:
+            self.process_optimization_vars()
+
+            if self.checkpoints_bool:
+                # Save constraints
+                for c_name in self.cvs:
+                    c_node = self.cvs[c_name]['node']
+                    self.system_graph.update_permanent_vars(c_node)
+
+                # Save objective
+                self.system_graph.update_permanent_vars(self.obj['node'])
+                
+        if self.checkpoints_bool:
+            if save_vars == 'all':
+                self.system_graph.save_all_outputs = True
+            else:
+                for var_name in save_vars:
+                    self.check_variable_existence(var_name)
+                    unique_id = self._find_unique_id(var_name)
+                    self.system_graph.update_permanent_vars(self._get_unique_node(unique_id))
 
         #  ----------- create model evaluation script -----------
-        if comm:
-            self.eval_instructions = Instructions(f'RUN_MODEL_{comm.rank}')
-        else:
-            self.eval_instructions = Instructions(f'RUN_MODEL')
+        # if comm:
+        #     self.eval_instructions = SingleInstruction(f'RUN_MODEL_{comm.rank}')
+        # else:
+        #     self.eval_instructions = SingleInstruction(f'RUN_MODEL')
 
         # This line basically creates the mode evaluation graph
-        eval_block, self.preeval_vars, state_vals_extracted, variable_info = self.system_graph.generate_evaluation()
-        self.eval_instructions.script.write(eval_block)
-        self.eval_instructions.compile()
+
+        # import cProfile
+        # profiler = cProfile.Profile()
+        # profiler.enable()
+
+        eval_instructions, self.preeval_vars, state_vals_extracted, variable_info = self.system_graph.generate_evaluation()
+        
+        # profiler.disable()
+        # profiler.dump_stats('output')
+        # analyze_dict_memory(self.preeval_vars, 'precomputed evaluation vars')
+
+        # self.eval_instructions.script.write(eval_block)
+        # self.eval_instructions.compile()
         self.variable_info = variable_info
         self.ran_bool = False
+
+        self.eval_instructions = eval_instructions
         if self.display_scripts:
             self.eval_instructions.save()
 
         #  ----------- create model evaluation script -----------
 
         # set up derivatives
-        for var in state_vals_extracted:
-            self.state_vals[var] = state_vals_extracted[var]
-
+        # for var in state_vals_extracted:
+        #     self.state_vals[var] = state_vals_extracted[var]
+        self.state_vals = state_vals_extracted
         # maps: (ofs, wrts) ---> Instructions object
         self.derivative_instructions_map = {}
         # if mode == 'rev':
@@ -241,11 +383,14 @@ class Simulator(SimulatorBase):
         '''
 
         # list of outputs and inputs to get derivatives of.
-        output_names = to_list(outputs)
-        input_names = to_list(inputs)
+        output_names = to_unique_list(outputs)
+        input_names = to_unique_list(inputs)
 
         # name of instructions
-        adj_name = 'DERIVATIVES'
+        if self.comm:
+            adj_name = f'DERIVATIVES_{self.comm.rank}_'
+        else: 
+            adj_name = 'DERIVATIVES'
         for output_name in output_names:
             adj_name += f'{output_name},'
         adj_name = adj_name.rstrip(adj_name[-1])
@@ -259,7 +404,7 @@ class Simulator(SimulatorBase):
 
         # initialize adjoint derivatives instructions to write to
         # This script will be ran every
-        adj_instructions = Instructions(adj_name)
+        adj_instructions = SingleInstruction(adj_name)
 
         # generate reverse is only a function of unique ID's therefore, find the appropriate id's for each input and output
         output_ids = []
@@ -271,17 +416,18 @@ class Simulator(SimulatorBase):
 
         # generate script
         print(f'\ngenerating: {adj_name}')
-        rev_script, pre_vars = self.system_graph.generate_reverse(output_ids, input_ids)
+        adj_instructions, pre_vars = self.system_graph.generate_reverse(output_ids, input_ids)
 
         # write the computation steps
-        adj_instructions.script.write(rev_script)
+        # adj_instructions.script.write(rev_script)
 
         # Save/compile
         if self.display_scripts:
             adj_instructions.save()
-        adj_instructions.compile()
+        # adj_instructions.compile()
         return adj_instructions, pre_vars
-
+    
+    # @profile
     def run(
             self,
             check_failure=False,
@@ -300,10 +446,10 @@ class Simulator(SimulatorBase):
         """
         # Execute compiled code, return all evaluated variables
         if not check_failure:
-            new_states = self._run(self.state_vals, **kwargs)
+            new_states = self._run(self.state_vals.state_values, **kwargs)
         else:
             try:
-                new_states = self._run(self.state_vals, **kwargs)
+                new_states = self._run(self.state_vals.state_values, **kwargs)
                 failure_flag = False
             except:
                 failure_flag = True
@@ -321,15 +467,25 @@ class Simulator(SimulatorBase):
                 self.recorder.record(save_dict, 'simulator')
                 # print('RECORDING TIME:', time.time() - start)
 
-        for key in self.state_vals:
+        num_size = 0
+        for key in self.state_vals.state_values:
             self.state_vals[key] = new_states[key]
 
+            if new_states[key] is None:
+                size = 0
+            else:
+                size = new_states[key].size
+            # print(key, size)
+            num_size += size
+        # print(num_size)
+        # exit()
         if check_failure:
             return failure_flag
-
+    
+    # @profile
     def _run(
         self,
-        states,
+        state_values,
         remember_implicit_states=True
     ):
         """
@@ -353,20 +509,20 @@ class Simulator(SimulatorBase):
         # if remember_implicit_states:
         #     self.remember_implicit_states()
             # print("remember")
-
-        eval_vars = {**states, **self.preeval_vars}
+        eval_vars = {**state_values, **self.preeval_vars}
         if self.comm:
             eval_vars['comm'] = self.comm
         new_states = self.eval_instructions.execute(eval_vars)
 
         return new_states
-
+    
+    # @profile
     def _generate_totals(self, of, wrt):
         '''
         generate derivatives
         '''
-        ofs = to_list(of)
-        wrts = to_list(wrt)
+        ofs = to_unique_list(of)
+        wrts = to_unique_list(wrt)
 
         # check to see if variables exist
         self.check_variable_existence(ofs)
@@ -390,8 +546,8 @@ class Simulator(SimulatorBase):
             raise ValueError('Simulator must be ran before computing derivatives.')
 
         # key of output/wrt combination.
-        ofs = to_list(of)
-        wrts = to_list(wrt)
+        ofs = to_unique_list(of)
+        wrts = to_unique_list(wrt)
         hash_key = (tuple(ofs), tuple(wrts))
 
         # check to see if variables exist
@@ -404,7 +560,8 @@ class Simulator(SimulatorBase):
             self._generate_totals(ofs, wrts)
 
         return hash_key, ofs, wrts
-
+    
+    # @profile
     def _compute_totals(self, hash_key, ofs, wrts, return_format):
         """
         executes the derivative evaluation codeobject of hash_key. should be only
@@ -412,8 +569,23 @@ class Simulator(SimulatorBase):
         """
         # Execute script
         vars = self.derivative_instructions_map[hash_key]['precomputed_vars']
+        if self.comm:
+            vars['comm'] = self.comm
         adj_exec = self.derivative_instructions_map[hash_key]['executable']
-        totals_dict = adj_exec.execute({**self.state_vals, **vars})
+
+        # print('\npreeval_vars before',len(vars))
+        # for key in vars:
+        #     print(key)
+
+        if self.checkpoints_bool:
+            # OLD
+            totals_dict = adj_exec.execute({**self.state_vals.state_values, **vars, **self.preeval_vars})
+        else:
+            totals_dict = adj_exec.execute({**self.state_vals.state_values, **vars})
+        # print('preeval_vars after',len(vars))
+
+        # from python_csdl_backend.utils.general_utils import analyze_dict_memory
+        # analyze_dict_memory(vars, 'vars')
 
         # Return computed totals
         return_dict = {}
@@ -427,6 +599,11 @@ class Simulator(SimulatorBase):
                 if isinstance(current_derivative, np.matrix):
                     current_derivative = np.asarray(current_derivative)
 
+                if self.comm is not None:
+                    wrt_node = self.system_graph.unique_to_node[wrt_id]
+                    owner_rank = self.system_graph.variable_owner_map[wrt_id]
+                    current_derivative = self.comm.bcast(current_derivative, root = owner_rank)
+
                 if var_local_name in totals_dict:
                     if return_format == '[(of, wrt)]':
                         return_dict[(of_name, wrt_name)] = current_derivative
@@ -435,7 +612,8 @@ class Simulator(SimulatorBase):
                             return_dict[of_name] = {}
                         return_dict[of_name][wrt_name] = current_derivative
         return return_dict
-
+    
+    # @profile
     def compute_totals(
         self,
         of,
@@ -527,6 +705,12 @@ class Simulator(SimulatorBase):
 
         if unique_id:
             return self.state_vals[unique_id]
+            if self.comm is not None:
+                owner_rank = self.system_graph.variable_owner_map[unique_id]
+                var = self.comm.bcast(self.state_vals[unique_id], root = owner_rank)
+                return var
+            else:
+                return self.state_vals[unique_id]
         else:
             raise KeyError(f'Variable {key} not found.')
 
@@ -586,7 +770,7 @@ class Simulator(SimulatorBase):
         return error if variable does not exist
         """
 
-        var_list = to_list(vars)
+        var_list = to_unique_list(vars)
 
         for var in var_list:
             if not self._find_unique_id(var):
@@ -642,8 +826,8 @@ class Simulator(SimulatorBase):
         else:
 
             # list of user given vars
-            of_list = to_list(of)
-            wrt_list = to_list(wrt)
+            of_list = to_unique_list(of)
+            wrt_list = to_unique_list(wrt)
 
             # check to see if user given variables exist
             self.check_variable_existence(of_list)
@@ -677,7 +861,10 @@ class Simulator(SimulatorBase):
             of=list(output_info.keys()),
             wrt=list(input_info.keys()),
         )
-
+        # if self.comm is not None:
+        #     if self.comm == 0:
+        # for key in analytical_derivs:
+        #     print(key, analytical_derivs[key])
         # compute finite difference
         fd_derivs = {}
         for input_name in input_info:
@@ -693,6 +880,7 @@ class Simulator(SimulatorBase):
                     analytical_jac = analytical_jac.A
                 except:
                     pass
+
                 fd_jac = fd_derivs[output_name, input_name]
                 error_jac = analytical_jac - fd_jac
 
@@ -709,74 +897,82 @@ class Simulator(SimulatorBase):
                     error_dict[(output_name, input_name)]['relative_error_norm'] = np.linalg.norm(error_jac)/np.linalg.norm(fd_jac)
 
         # print
-        max_key_len = len('(of,wrt)')
-        max_rel_len = len('relative error')
-        max_calc_len = len('calc norm')
-        max_abs_len = len('abs_error_norm')
-        for key in error_dict:
-            key_str = str(key)
-            if len(key_str) > max_key_len:
-                max_key_len = len(key_str)
 
-            rel_error_str = str(error_dict[key]['relative_error_norm'])
-            if len(rel_error_str) > max_rel_len:
-                max_rel_len = len(rel_error_str)
-
-            calc_norm_str = str(error_dict[key]['analytical_norm'])
-            if len(calc_norm_str) > max_calc_len:
-                max_calc_len = len(calc_norm_str)
-
-            abs_error_str = str(error_dict[key]['abs_error_norm'])
-            if len(abs_error_str) > max_abs_len:
-                max_abs_len = len(abs_error_str)
-
-        max_key_len += 5
-        max_rel_len += 5
-        max_calc_len += 5
-
-        if compact_print:
-            print()
-
-            error_bar = '-'*(max_key_len+max_rel_len+max_calc_len+max_abs_len)
-            of_wrt_str = lineup_string('(of,wrt)', max_key_len)
-            rel_error_title = lineup_string('relative error', max_rel_len)
-            computed_norm_title = lineup_string('calc norm', max_calc_len)
-
-            print(f'{of_wrt_str}{computed_norm_title}{rel_error_title}absolute error')
-
-            # --------------------------------------
-            print(error_bar)
-            for key in error_dict:
-
-                key_str = lineup_string(str(key), max_key_len)
-
-                calc_norm = error_dict[key]['analytical_norm']
-                calc_norm_str = lineup_string(str(calc_norm), max_calc_len)
-
-                rel_error = error_dict[key]['relative_error_norm']
-                rel_error_str = lineup_string(str(rel_error), max_rel_len)
-
-                abs_error = error_dict[key]['abs_error_norm']
-                print(f'{key_str}{calc_norm_str}{rel_error_str}{abs_error}')
-            print(error_bar)
-            # --------------------------------------
-            print()
+        if (self.comm is None):
+            rank = 0
         else:
-            print()
+            rank = self.comm.rank
+        
+        if rank == 0:
+        # if rank > -1:
+            max_key_len = len('(of,wrt)')
+            max_rel_len = len('relative error')
+            max_calc_len = len('calc norm')
+            max_abs_len = len('abs_error_norm')
             for key in error_dict:
-                print(f'\n----------------------------------------------------')
-                rel_error = error_dict[key]['relative_error_norm']
-                if rel_error > 1e-5:
-                    print('WARNING: RELATIVE ERROR ABOVE BOUND')
-                abs_error = error_dict[key]['abs_error_norm']
-                print(f'{key}\t{rel_error}\t{abs_error}')
-                print('finite difference:')
-                print(fd_derivs[key])
-                print('analytical:')
-                print(analytical_derivs[key])
+                key_str = str(key)
+                if len(key_str) > max_key_len:
+                    max_key_len = len(key_str)
 
-            print(f'----------------------------------------------------')
-            print()
+                rel_error_str = str(error_dict[key]['relative_error_norm'])
+                if len(rel_error_str) > max_rel_len:
+                    max_rel_len = len(rel_error_str)
+
+                calc_norm_str = str(error_dict[key]['analytical_norm'])
+                if len(calc_norm_str) > max_calc_len:
+                    max_calc_len = len(calc_norm_str)
+
+                abs_error_str = str(error_dict[key]['abs_error_norm'])
+                if len(abs_error_str) > max_abs_len:
+                    max_abs_len = len(abs_error_str)
+
+            max_key_len += 5
+            max_rel_len += 5
+            max_calc_len += 5
+
+            if compact_print:
+                print()
+
+                error_bar = '-'*(max_key_len+max_rel_len+max_calc_len+max_abs_len)
+                of_wrt_str = lineup_string('(of,wrt)', max_key_len)
+                rel_error_title = lineup_string('relative error', max_rel_len)
+                computed_norm_title = lineup_string('calc norm', max_calc_len)
+
+                print(f'{of_wrt_str}{computed_norm_title}{rel_error_title}absolute error')
+
+                # --------------------------------------
+                print(error_bar)
+                for key in error_dict:
+
+                    key_str = lineup_string(str(key), max_key_len)
+
+                    calc_norm = error_dict[key]['analytical_norm']
+                    calc_norm_str = lineup_string(str(calc_norm), max_calc_len)
+
+                    rel_error = error_dict[key]['relative_error_norm']
+                    rel_error_str = lineup_string(str(rel_error), max_rel_len)
+
+                    abs_error = error_dict[key]['abs_error_norm']
+                    print(f'{key_str}{calc_norm_str}{rel_error_str}{abs_error}')
+                print(error_bar)
+                # --------------------------------------
+                print()
+            else:
+                print()
+                for key in error_dict:
+                    print(f'\n----------------------------------------------------')
+                    rel_error = error_dict[key]['relative_error_norm']
+                    if rel_error > 1e-5:
+                        print('WARNING: RELATIVE ERROR ABOVE BOUND')
+                    abs_error = error_dict[key]['abs_error_norm']
+                    print(f'{key}\t{rel_error}\t{abs_error}')
+                    print('finite difference:')
+                    print(fd_derivs[key])
+                    print('analytical:')
+                    print(analytical_derivs[key])
+
+                print(f'----------------------------------------------------')
+                print()
 
         return error_dict
 
@@ -787,20 +983,34 @@ class Simulator(SimulatorBase):
 
         # initialize finite difference jacobian to matrices with value 1e6
         fd_jacs = {}
+        original_out_vals = {}
+
         for output_name in outputs_dict:
             output_size = outputs_dict[output_name]['size']
             output_shape = outputs_dict[output_name]['shape']
             fd_jacs[(output_name, input_name)] = 1e6*np.ones((output_size, input_size))
 
+            output_id = self._find_unique_id(output_name)
+
+            original_out_vals[output_name] = self[output_id].flatten()
+
         # perform finite difference:
         for col_index in range(input_size):
 
             # set perturbed inputs
-            temp_state = self.state_vals.copy()
+            temp_state = self.state_vals.state_values.copy()
             input_id = self._find_unique_id(input_name)
-            temp_state[input_id] = temp_state[input_id].flatten()
-            temp_state[input_id][col_index] = temp_state[input_id][col_index] + delta
-            temp_state[input_id] = temp_state[input_id].reshape(input_shape)
+
+            set_input = False
+            if self.comm is None:
+                set_input = True
+            elif self.state_vals.rank_owner_mapping[input_id] == self.comm.rank:
+                set_input = True
+
+            if set_input:
+                temp_state[input_id] = temp_state[input_id].flatten()
+                temp_state[input_id][col_index] = temp_state[input_id][col_index] + delta
+                temp_state[input_id] = temp_state[input_id].reshape(input_shape)
 
             # compute f(x+h)
             new_states = self._run(temp_state, remember_implicit_states=False)
@@ -811,10 +1021,16 @@ class Simulator(SimulatorBase):
                 output_size = outputs_dict[output_name]['size']
                 output_shape = outputs_dict[output_name]['shape']
 
-                output_val_perturbed = new_states[output_id].flatten()
-                output_val_original = self.state_vals[output_id].flatten()
+                if self.comm is not None:
+                    owner_rank = self.system_graph.variable_owner_map[output_id]
+                    var = self.comm.bcast(new_states[output_id], root = owner_rank)
+                    output_val_perturbed = var.flatten()
+                else:
+
+                    output_val_perturbed = new_states[output_id].flatten()
+                # output_val_original = self[output_id].flatten()
+                output_val_original = original_out_vals[output_name]
                 output_check_derivative = (output_val_perturbed - output_val_original)/delta
-                # print(output_name, (output_val_perturbed - output_val_original))
 
                 for row_index in range(output_size):
                     fd_jacs[(output_name, input_name)][row_index, col_index] = output_check_derivative[row_index]
@@ -895,6 +1111,7 @@ class Simulator(SimulatorBase):
 
             self.state_vals[dv_id] = new_val.reshape(shape)
 
+    # @profile
     def compute_total_derivatives(self, check_failure=False):
         """
         computes derivatives of objective/constraints wrt design variables.

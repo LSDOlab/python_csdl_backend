@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.sparse_utils import sparse_matrix
@@ -29,13 +29,13 @@ class VectorizedPNormLite(OperationBase):
         self.in_name = operation.dependencies[0].name
         self.out_name = operation.outs[0].name
         self.pnorm_type = operation.literals['pnorm_type']
-        self.val = operation.dependencies[0].val
+        # self.val = operation.dependencies[0].val
 
     def get_evaluation(self, eval_block, vars):
 
         eval_block.write(f'{self.get_output_id(self.out_name)} = np.linalg.norm({self.get_input_id(self.in_name)}.flatten(), ord={self.pnorm_type})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
         key_tuple = get_only(partials_dict)
         input = key_tuple[1].id
         output = key_tuple[0].id
@@ -62,7 +62,7 @@ class VectorizedAxisWisePNormLite(OperationBase):
         self.in_name = operation.dependencies[0].name
         self.out_name = operation.outs[0].name
         self.pnorm_type = operation.literals['pnorm_type']
-        self.val = operation.dependencies[0].val
+        # self.val = operation.dependencies[0].val
         self.axis = operation.literals['axis']
         self.out_shape = tuple(np.delete(operation.dependencies[0].shape, operation.literals['axis']))
 
@@ -98,7 +98,7 @@ class VectorizedAxisWisePNormLite(OperationBase):
 
         eval_block.write(f'{self.get_output_id(self.out_name)} = np.sum({self.get_input_id(self.in_name)}**{self.pnorm_type},axis={self.axis})**(1 / {self.pnorm_type})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         key_tuple = get_only(partials_dict)
         input = key_tuple[1].id

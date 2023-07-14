@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.sparse_utils import sparse_matrix
@@ -32,6 +32,7 @@ class IndexedPassthroughLite(OperationBase):
         # print(self.out_name)
         # print(name)å
         # print(self.indices)
+        self.linear = True
 
     def get_evaluation(self, eval_block, vars):
 
@@ -47,7 +48,7 @@ class IndexedPassthroughLite(OperationBase):
             eval_block.write(f'{self.out_name_temp}[i_{in_name}_{self.name}] = {in_name}.flatten()')
             eval_block.write(f'{self.out_name} = {self.out_name_temp}.copy()')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         for key_tuple in partials_dict:
             input_id = key_tuple[1].id

@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 import numpy as np
@@ -25,7 +25,7 @@ class VectorOuterProductLite(OperationBase):
         out_name = operation.outs[0].name
         in_shapes = [var.shape[0] for var in operation.dependencies]
         self.in_shapes = in_shapes
-        in_vals = [var.val for var in operation.dependencies]
+        # in_vals = [var.val for var in operation.dependencies]
 
         self.out_size = np.prod(operation.outs[0].shape)
 
@@ -40,7 +40,7 @@ class VectorOuterProductLite(OperationBase):
 
         eval_block.write(f'{self.out_id} = np.outer({self.in_ids[0]}, {self.in_ids[1]})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         row_name = f'{self.name}_rows'
         vars[row_name] = self.rows
@@ -79,7 +79,7 @@ class TensorOuterProductLite(OperationBase):
         out_name = operation.outs[0].name
         in_shapes = [var.shape for var in operation.dependencies]
         self.in_shapes = in_shapes
-        in_vals = [var.val for var in operation.dependencies]
+        # in_vals = [var.val for var in operation.dependencies]
 
         self.out_size = np.prod(operation.outs[0].shape)
         self.out_id = self.get_output_id(out_name)
@@ -109,7 +109,7 @@ class TensorOuterProductLite(OperationBase):
         # eval_block.write(f'{self.out_id} = np.outer({self.in_ids[0]}, {self.in_ids[1]})')
         eval_block.write(f'{self.out_id} = np.einsum(\'{self.subscript}\', {self.in_ids[0]},{self.in_ids[1]}).reshape({self.operation.outs[0].shape})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         row_name = f'{self.name}_rows'
         vars[row_name] = self.rows

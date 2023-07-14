@@ -1,13 +1,13 @@
 SPARSE_SIZE_CUTOFF = 100
 import numpy as np
 
-def to_list(object):
+def to_unique_list(object):
     '''
     'listifies' object
     '''
 
     if isinstance(object, list):
-        return object
+        return sorted([*set(object)])
     else:
         return [object]
 

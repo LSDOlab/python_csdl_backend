@@ -29,6 +29,7 @@ class OperationBase():
         self.jac_is_function = False
         self.op_summary_block = CodeBlock(add_name=False)
         self.elementwise = operation.properties['elementwise']
+        self.linear = False
 
         # map to landuage variable and representation variable
         self.input_csdl_to_rep = {}
@@ -220,7 +221,7 @@ class OperationBase():
 
         raise NotImplementedError('Evaluation script is not implemented')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
         """
         returns a CodeBlock object that contains script to write:
 

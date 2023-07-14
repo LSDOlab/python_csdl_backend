@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.sparse_utils import get_sparsity
@@ -31,6 +31,7 @@ class SingleTensorAverageLite(OperationBase):
         self.out_shape = operation.outs[0].shape
         self.axes = operation.literals['axes']
         # self.val = operation.dependencies[0].val
+        self.linear = True
 
         in_name = self.in_name
         shape = self.shape
@@ -86,7 +87,7 @@ class SingleTensorAverageLite(OperationBase):
             vars[axis_name] = axes
             eval_block.write(f'{self.get_output_id(out_name)} = np.average({self.get_input_id(in_name)}, axis={axis_name})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         key_tuple = get_only(partials_dict)
         input = key_tuple[1].id
@@ -209,7 +210,7 @@ class MultipleTensorAverageLite(OperationBase):
                 eval_block.write(f'{out_id} += np.average({self.get_input_id(in_names[i])}, axis={axes})')
             eval_block.write(f'{out_id} = {out_id}/{self.num_inputs}')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
         for key_tuple in partials_dict:
             input = key_tuple[1].id
             output = key_tuple[0].id

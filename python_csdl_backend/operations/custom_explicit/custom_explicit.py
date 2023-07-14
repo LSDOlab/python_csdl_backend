@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.sparse_utils import sparse_matrix
@@ -9,6 +9,7 @@ from python_csdl_backend.utils.custom_utils import (
     process_custom_derivatives_metadata,
     prepare_compute_derivatives,
     postprocess_compute_derivatives,
+    is_empty_function,
 )
 
 from csdl import CustomExplicitOperation
@@ -61,7 +62,7 @@ class CustomExplicitLite(OperationBase):
             out_name = self.get_output_id(output)
             eval_block.write(f'{out_name} = temp[{i}].copy()')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         for key_tuple in partials_dict:
             input_id = key_tuple[1].id
@@ -72,7 +73,7 @@ class CustomExplicitLite(OperationBase):
             output = self.get_lang_output(output_id)
             input = self.get_lang_input(input_id)
             vars[self.wrapper_func_name] = self.explicit_wrapper
-            partials_block.write(f'{partial_name} = {self.wrapper_func_name}.get_partials(\'{output}\', \'{input}\')')
+            partials_block.write(f'{partial_name} = {self.wrapper_func_name}.get_custom_explicit_partials(\'{output}\', \'{input}\')')
 
     def get_accumulation_function(self, input_paths, path_output, partials_block, vars):
 
@@ -117,10 +118,12 @@ class CustomExplicitWrapper():
 
         # check if user implemented compute_jacvec or compute_partials
         # Not sure the best way to do this.
-        test_instance = CustomExplicitOperation()
-        if test_instance.compute_derivatives.__func__ is op.compute_derivatives.__func__:
+        # test_instance = CustomExplicitOperation()
+        # if test_instance.compute_derivatives.__func__ is op.compute_derivatives.__func__:
+        if is_empty_function(op.compute_derivatives.__func__):
 
-            if test_instance.compute_jacvec_product.__func__ is not op.compute_jacvec_product.__func__:
+            # if test_instance.compute_jacvec_product.__func__ is not op.compute_jacvec_product.__func__:
+            if not is_empty_function(op.compute_jacvec_product.__func__):
                 self.use_compute_jacvec = True
             else:
                 all_deriv_vals_given = True
@@ -133,7 +136,8 @@ class CustomExplicitWrapper():
                 else:
                     raise ValueError(f'either compute_jacvec_product or compute_derivatives must be defined in {op}')
         else:
-            if test_instance.compute_jacvec_product.__func__ is not op.compute_jacvec_product.__func__:
+            # if test_instance.compute_jacvec_product.__func__ is not op.compute_jacvec_product.__func__:
+            if not is_empty_function(op.compute_jacvec_product.__func__):
                 # If both compute_jacvec and compute_derivatives are overwritten, use copmute_derivatives for now
                 self.use_compute_jacvec = False
             else:
@@ -173,7 +177,7 @@ class CustomExplicitWrapper():
         # return tuple of numpy arrays
         return output_tuple
 
-    def get_partials(self, output_name, input_name):
+    def get_custom_explicit_partials(self, output_name, input_name):
 
         if self.needs_partials:
             self.totals = self.compute_derivatives(self.inputs)

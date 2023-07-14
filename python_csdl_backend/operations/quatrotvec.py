@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 import numpy as np
@@ -23,8 +23,8 @@ class QuatrotvecLite(OperationBase):
         self.quat_size = np.prod(operation.dependencies[0].shape)
         self.vec_name = operation.dependencies[1].name
         self.vec_size = np.prod(operation.dependencies[1].shape)
-        self.quat_vals = operation.dependencies[0].val
-        self.vec_vals = operation.dependencies[1].val
+        # self.quat_vals = operation.dependencies[0].val
+        # self.vec_vals = operation.dependencies[1].val
         self.out_name = operation.outs[0].name
         self.out_id = self.get_output_id(self.out_name)
         self.out_size = np.prod(operation.outs[0].shape)
@@ -127,7 +127,7 @@ class QuatrotvecLite(OperationBase):
 
         return popv, popq
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         partials_func_name = self.name+'_partials_func'
         out_tuple_name = self.name+'_partials_out'

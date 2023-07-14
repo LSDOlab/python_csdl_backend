@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 import numpy as np
@@ -24,8 +24,9 @@ class SparsematmatLite(OperationBase):
         self.sparse_mat_eval = operation.literals['sparse_mat']
         self.in_name = self.get_input_id(in_name)
         self.out_name = self.get_output_id(out_name)
+        self.linear = True
 
-        val = operation.dependencies[0].val
+        # val = operation.dependencies[0].val
         self.sparse_mat = operation.literals['sparse_mat']
 
         self.num_sparse_rows = self.sparse_mat.shape[0]
@@ -60,7 +61,7 @@ class SparsematmatLite(OperationBase):
         str = f'{self.out_name} = {sparse_mat_name}@{self.in_name}'
         eval_block.write(str)
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         key_tuple = get_only(partials_dict)
         input = key_tuple[1].id

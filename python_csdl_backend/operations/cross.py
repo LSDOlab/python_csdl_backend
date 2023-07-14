@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.sparse_utils import sparse_matrix
@@ -27,59 +27,61 @@ class CrossLite(OperationBase):
         self.in2_name = operation.dependencies[1].name
         self.out_name = operation.outs[0].name
         self.axis = operation.literals['axis']
-        self.in1_val = operation.dependencies[0].val
-        self.in2_val = operation.dependencies[1].val
+        # self.in1_val = operation.dependencies[0].val
+        # self.in2_val = operation.dependencies[1].val
 
         self.outsize = np.prod(self.shape)
         self.insize = self.outsize
 
-        indices = get_array_indices(*self.shape)
+        self.indices = get_array_indices(*self.shape)
 
         self.shape_without_axis = self.shape[:self.axis] + self.shape[self.axis + 1:]
 
-        ones = np.ones(3, int)
+        self.ones = np.ones(3, int)
 
         rank = len(self.shape_without_axis)
 
-        einsum_string_rows = '{}y{},z->{}{}yz'.format(
+        self.einsum_string_rows = '{}y{},z->{}{}yz'.format(
             alphabet[:self.axis],
             alphabet[self.axis:rank],
             alphabet[:self.axis],
             alphabet[self.axis:rank],
         )
 
-        einsum_string_cols = '{}y{},z->{}{}zy'.format(
+        self.einsum_string_cols = '{}y{},z->{}{}zy'.format(
             alphabet[:self.axis],
             alphabet[self.axis:rank],
             alphabet[:self.axis],
             alphabet[self.axis:rank],
         )
 
-        self.rows1 = np.einsum(
-            einsum_string_rows,
-            indices,
-            ones,
-        ).flatten()
+        # self.rows1 = np.einsum(
+        #     einsum_string_rows,
+        #     indices,
+        #     ones,
+        # ).flatten()
 
-        self.cols1 = np.einsum(
-            einsum_string_cols,
-            indices,
-            ones,
-        ).flatten()
+        # self.cols1 = np.einsum(
+        #     einsum_string_cols,
+        #     indices,
+        #     ones,
+        # ).flatten()
 
-        # self.declare_partials(out_name, in1_name, rows=rows, cols=cols)
+        # # self.declare_partials(out_name, in1_name, rows=rows, cols=cols)
 
-        self.rows2 = np.einsum(
-            einsum_string_rows,
-            indices,
-            ones,
-        ).flatten()
+        # self.rows2 = np.einsum(
+        #     einsum_string_rows,
+        #     indices,
+        #     ones,
+        # ).flatten()
 
-        self.cols2 = np.einsum(
-            einsum_string_cols,
-            indices,
-            ones,
-        ).flatten()
+        # self.cols2 = np.einsum(
+        #     einsum_string_cols,
+        #     indices,
+        #     ones,
+        # ).flatten()
+
+        # print(self.rows1.nbytes, self.rows2.nbytes, self.cols1.nbytes, self.cols2.nbytes)
 
         # self.declare_partials(out_name, in2_name, rows=rows, cols=cols)
 
@@ -90,7 +92,20 @@ class CrossLite(OperationBase):
         in2 = self.get_input_id(self.in2_name)
         eval_block.write(f'{out} = np.cross({in1}, {in2}, axisa = {self.axis}, axisb = {self.axis}, axisc = {self.axis})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
+        
+        if not lazy:
+            self.rows = np.einsum(
+                self.einsum_string_rows,
+                self.indices,
+                self.ones,
+            ).flatten()
+
+            self.cols = np.einsum(
+                self.einsum_string_cols,
+                self.indices,
+                self.ones,
+            ).flatten()
 
         for key_tuple in partials_dict:
             input = key_tuple[1].id
@@ -131,13 +146,36 @@ class CrossLite(OperationBase):
                         tmps[ind] = array
 
                     val = (tmps[0] + tmps[1] + tmps[2]).flatten()
+                    
+                    if not lazy:
+                        if is_sparse_jac:
+                            jac = sp.csc_matrix((val, (self.rows, self.cols)), shape=(self.outsize, self.insize))
+                        else:
+                            jac = np.zeros((self.outsize, self.insize))
+                            jac[self.rows, self.cols] = val
 
-                    if is_sparse_jac:
-                        jac = sp.csc_matrix((val, (self.rows1, self.cols1)), shape=(self.outsize, self.insize))
                     else:
-                        jac = np.zeros((self.outsize, self.insize))
-                        jac[self.rows1, self.cols1] = val
+                        rows = np.einsum(
+                            self.einsum_string_rows,
+                            self.indices,
+                            self.ones,
+                        ).flatten()
 
+                        cols = np.einsum(
+                            self.einsum_string_cols,
+                            self.indices,
+                            self.ones,
+                        ).flatten()
+
+                        if is_sparse_jac:
+                            jac = sp.csc_matrix((val, (rows, cols)), shape=(self.outsize, self.insize))
+                        else:
+                            jac = np.zeros((self.outsize, self.insize))
+                            jac[rows, cols] = val
+
+                        del rows
+                        del cols
+                        del val
                     return jac
 
             elif input == self.get_input_id(self.in2_name):
@@ -173,11 +211,34 @@ class CrossLite(OperationBase):
 
                     val = (tmps[0] + tmps[1] + tmps[2]).flatten()
 
-                    if is_sparse_jac:
-                        jac = sp.csc_matrix((val, (self.rows2, self.cols2)), shape=(self.outsize, self.insize))
+                    if not lazy:
+                        if is_sparse_jac:
+                            jac = sp.csc_matrix((val, (self.rows, self.cols)), shape=(self.outsize, self.insize))
+                        else:
+                            jac = np.zeros((self.outsize, self.insize))
+                            jac[self.rows, self.cols] = val
                     else:
-                        jac = np.zeros((self.outsize, self.insize))
-                        jac[self.rows2, self.cols2] = val
+                        rows = np.einsum(
+                            self.einsum_string_rows,
+                            self.indices,
+                            self.ones,
+                        ).flatten()
+
+                        cols = np.einsum(
+                            self.einsum_string_cols,
+                            self.indices,
+                            self.ones,
+                        ).flatten()
+
+                        if is_sparse_jac:
+                            jac = sp.csc_matrix((val, (rows, cols)), shape=(self.outsize, self.insize))
+                        else:
+                            jac = np.zeros((self.outsize, self.insize))
+                            jac[rows, cols] = val
+
+                        del rows
+                        del cols
+                        del val
 
                     return jac
 

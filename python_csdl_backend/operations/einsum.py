@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.sparse_utils import sparse_matrix
@@ -31,7 +31,7 @@ class EinSumLite(OperationBase):
         self.out_name = operation.outs[0].name
         self.operation_ss = operation.literals['subscripts']
         out_shape = operation.outs[0].shape
-        self.in_vals = [var.val for var in operation.dependencies]
+        # self.in_vals = [var.val for var in operation.dependencies]
 
         # Find unused characters in operation
         check_string = 'abcdefghijklmnopqrstuvwxyz'
@@ -78,8 +78,7 @@ class EinSumLite(OperationBase):
         self.I = []
         operation_aslist = self.operation_aslist
 
-        for in_name_index, (in_name,
-                            in_val) in enumerate(zip(self.in_names, self.in_vals)):
+        for in_name_index, in_name in enumerate(zip(self.in_names)):
             if in_name in completed_in_names:
                 continue
             else:
@@ -117,7 +116,7 @@ class EinSumLite(OperationBase):
         out_id = self.get_output_id(self.out_name)
         eval_block.write(f'{out_id} = np.einsum(\'{self.operation_ss}\' {in_argument})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         def compute_partials(*input_vals):
 

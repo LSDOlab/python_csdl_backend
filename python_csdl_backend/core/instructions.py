@@ -1,9 +1,10 @@
 from python_csdl_backend.core.codeblock import CodeBlock
+from python_csdl_backend.utils.general_utils import analyze_dict_memory
 import numpy as np
 import scipy.sparse as sp
+import gc
 
-
-class Instructions():
+class SingleInstruction():
 
     def __init__(self, name):
         """ 
@@ -30,7 +31,7 @@ class Instructions():
         Saves the codeblock script.
         """
         self.script.save()
-
+    # @profile
     def execute(self, inputs):
         """
         Executes compiled script. Returns dictionary of all local variable values.
@@ -52,3 +53,51 @@ class Instructions():
 
         # Return local variables
         return locals
+
+
+class MultiInstructions():
+    
+    def __init__(self, name):
+        """ 
+        Container for multiple ordered separate instructions.
+        """
+
+        self.name = 'MultiInstructions_' + name
+        self.ordered_instructions = []
+
+    def add_single_instruction(self, single_instruction, variables_to_delete):
+
+        instructions_dict = {}
+        instructions_dict['single_instruction'] = single_instruction
+        instructions_dict['variables_to_delete'] = variables_to_delete
+        self.ordered_instructions.append(instructions_dict)
+
+    def execute(self, states):
+        locals_temp = states
+        for i, instruction_dict in enumerate(self.ordered_instructions):
+            instruction = instruction_dict['single_instruction']
+            # print('bef', i, instruction.name, len(states))
+
+            locals = instruction.execute(locals_temp)
+            
+            # print('ran', i, instruction.name, len(states))
+            delete_vars = instruction_dict['variables_to_delete']
+            for var in delete_vars:
+                if var not in locals:
+                    raise ValueError('Variable ' + var + ' not in locals.')
+                locals[var] = None
+
+            locals_temp = locals
+
+            # gc.collect()
+            # -=-=-=-=-=-=-=-=-=-=-=-=-=-= UNCOMMENT FOR MEMORY DEBUGGING -=-=-=-=-=-=-=-=-=-=-=-=-=-=
+            # analyze_dict_memory(locals, instruction.name)
+            
+        return locals
+    
+    def save(self):
+        """ 
+        Saves the codeblock script.
+        """
+        for instruction_dict in self.ordered_instructions:
+            instruction_dict['single_instruction'].save()

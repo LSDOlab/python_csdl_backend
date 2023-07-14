@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 import numpy as np
 import scipy.sparse as sp
@@ -52,7 +52,7 @@ class PowerCombinationLite(OperationBase):
         # eval_block.write(f'print(\'{output_name}\',{output_name}.shape)')
         eval_block.write(f'{output_name} = ({output_name}*{self.coeff_name}).reshape({self.out_shape})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         for key_tuple in partials_dict:
             input = key_tuple[1].id
@@ -64,16 +64,14 @@ class PowerCombinationLite(OperationBase):
             shape = self.out_shape
             size = np.prod(shape)
             coeff_name = self.coeff_name+'_temp'
-            vars[coeff_name] = self.coeff_val*np.ones(shape)
 
-            partial_ind_name = partial_name+'_inds'
-            vars[partial_name+'_inds'] = tuple(np.arange(size))
-            if is_sparse_jac:
-                pass
+            if lazy:
+                vars[coeff_name] = self.coeff_val
+                partials_block.write(f'temp_power = {coeff_name}*np.ones({shape})')
             else:
-                vars[partial_name] = np.eye(size)
+                vars[coeff_name] = self.coeff_val*np.ones(shape)
+                partials_block.write(f'temp_power = {coeff_name}')
 
-            partials_block.write(f'temp_power = {coeff_name}')
             for in_name, power in zip(self.in_names, self.powers):
                 a = 1.
                 b = power

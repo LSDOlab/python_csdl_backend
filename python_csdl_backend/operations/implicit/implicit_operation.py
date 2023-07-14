@@ -1,5 +1,6 @@
 from csdl import ImplicitOperation, BracketedSearchOperation
 from python_csdl_backend.operations.operation_base import OperationBase
+from python_csdl_backend.core.state_manager import StateManager
 
 from csdl.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from csdl.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
@@ -162,10 +163,11 @@ class ImplicitLite(OperationBase):
         for i, path in enumerate(input_paths):
             partials_block.write(f'{path} = {self.operation_name}_path_in[{i}]')
 
-    def set_initial_state_guess(self, state_dict):
+    def set_initial_state_guess(self, state_dict: StateManager):
 
         for state_name in self.solver.states:
             self.state_outid_to_initial_guess[self.get_output_id(state_name)] = self.to_initial_guess_name(state_name)
+            state_dict.reserve_state(self.to_initial_guess_name(state_name), shape = self.solver.states[state_name]['initial_val'].shape)
             state_dict[self.to_initial_guess_name(state_name)] = self.solver.states[state_name]['initial_val']
 
     def to_initial_guess_name(self, name):

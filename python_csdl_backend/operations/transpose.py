@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 import numpy as np
@@ -17,6 +17,7 @@ class TransposeLite(OperationBase):
         op_name = 'transpose'
         name = f'{name}_{op_name}'
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
+        self.linear = True
 
         self.shape = self.operation.dependencies[0].shape
         in_shape = self.shape
@@ -24,7 +25,7 @@ class TransposeLite(OperationBase):
         size = self.input_size
         in_name = self.operation.dependencies[0].name
         self.out_name = self.operation.outs[0].name
-        val = self.operation.dependencies[0].val
+        # val = self.operation.dependencies[0].val
         out_shape = self.operation.outs[0].shape,
 
         self.input_name = self.get_input_id(in_name)
@@ -64,7 +65,7 @@ class TransposeLite(OperationBase):
 
         eval_block.write(f'{self.output_name} = np.transpose({self.input_name})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         key_tuple = get_only(partials_dict)
         input = key_tuple[1].id

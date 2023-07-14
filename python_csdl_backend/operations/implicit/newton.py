@@ -93,7 +93,7 @@ class NewtonLiteSolver(ImplicitSolverBase):
                 new_state = self.function_wrapper.get_state(state) - solved_vec[state].reshape(self.states[state]['shape'])
                 self.function_wrapper.set_state(state, new_state)
 
-        print(nl_solver_completion_status('newton solver', iter, self.tol, solved))
+        print(nl_solver_completion_status('newton solver', iter, self.tol, solved), error)
 
         # Shouldn't be necessary?
         # if self.full_residual_jac:

@@ -6,6 +6,7 @@ from python_csdl_backend.utils.custom_utils import (
     process_custom_derivatives_metadata,
     prepare_compute_derivatives,
     postprocess_compute_derivatives,
+    is_empty_function,
 )
 from csdl import CustomImplicitOperation
 
@@ -69,15 +70,15 @@ class ImplicitCustomWrapper(ImplicitWrapperBase):
         self.input_vals = {}
 
         # check which user defined methods have been given
-        test_instance = CustomImplicitOperation()
+        # test_instance = CustomImplicitOperation()
         self.CD_given = False
-        if test_instance.compute_derivatives.__func__ is not op.compute_derivatives.__func__:
+        if not is_empty_function(op.compute_derivatives.__func__):
             self.CD_given = True
         self.CJVP_given = False
-        if test_instance.compute_jacvec_product.__func__ is not op.compute_jacvec_product.__func__:
+        if not is_empty_function(op.compute_jacvec_product.__func__):
             self.CJVP_given = True
         self.AIJ_given = False
-        if test_instance.apply_inverse_jacobian.__func__ is not op.apply_inverse_jacobian.__func__:
+        if not is_empty_function(op.apply_inverse_jacobian.__func__):
             self.AIJ_given = True
 
         # determine which combination of user-defined derivative methods we use:

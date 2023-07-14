@@ -194,3 +194,18 @@ def postprocess_compute_derivatives(totals, derivative_meta):
         else:
             # If standard derivative, just use user-given derivatie directly.
             totals[derivative_tuple] = totals[derivative_tuple].reshape((size_out, size_in))
+
+
+
+def is_empty_function(func):
+    """Check if a function is empty."""
+    def empty_func():
+        pass
+
+    def empty_func_with_doc():
+        """Empty function with docstring."""
+        pass
+
+    isempty =  func.__code__.co_code == empty_func.__code__.co_code or \
+        func.__code__.co_code == empty_func_with_doc.__code__.co_code
+    return isempty

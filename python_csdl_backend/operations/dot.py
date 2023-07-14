@@ -1,6 +1,6 @@
 from python_csdl_backend.operations.operation_base import OperationBase
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.operation_utils import to_list, get_scalars_list
+from python_csdl_backend.utils.operation_utils import to_unique_list, get_scalars_list
 from python_csdl_backend.utils.operation_utils import SPARSE_SIZE_CUTOFF
 from python_csdl_backend.utils.general_utils import get_only
 from python_csdl_backend.utils.sparse_utils import sparse_matrix
@@ -26,7 +26,7 @@ class VecDotLite(OperationBase):
         self.in_names = [var.name for var in operation.dependencies]
         self.out_name = operation.outs[0].name
         self.in_shape = operation.dependencies[0].shape[0]
-        self.in_vals = [var.val for var in operation.dependencies]
+        # self.in_vals = [var.val for var in operation.dependencies]
         self.in1 = self.get_input_id(self.in_names[0])
         self.in2 = self.get_input_id(self.in_names[1])
 
@@ -35,7 +35,7 @@ class VecDotLite(OperationBase):
         out = self.get_output_id(self.out_name)
         eval_block.write(f'{out} = np.dot({self.in1}, {self.in2})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         for key_tuple in partials_dict:
             input_not = key_tuple[1].id
@@ -62,7 +62,7 @@ class TenDotLite(OperationBase):
         self.in_shape = operation.dependencies[0].shape
         self.axis = operation.literals['axis']
         self.out_shape = operation.outs[0].shape
-        self.in_vals = [var.val for var in operation.dependencies]
+        # self.in_vals = [var.val for var in operation.dependencies]
 
         if self.out_shape == None:
             self.out_shape = tuple(np.delete(list(self.in_shape), self.axis))
@@ -85,7 +85,7 @@ class TenDotLite(OperationBase):
         out = self.get_output_id(self.out_name)
         eval_block.write(f'{out} = np.sum({self.in1} * {self.in2}, axis={self.axis})')
 
-    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac):
+    def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         row_name = f'{self.name}_rows'
         col_name = f'{self.name}_cols'
