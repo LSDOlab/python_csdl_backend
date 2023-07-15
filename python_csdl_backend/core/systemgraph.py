@@ -415,6 +415,7 @@ class SystemGraph(object):
                 
 
                 # print(np.prod(csdl_node.shape)*4)
+                # del_csdl_val = False
                 if del_csdl_val:
                     csdl_node.val = None
                     del csdl_node.val
@@ -905,8 +906,8 @@ class SystemGraph(object):
                             # elif (pred_size < 100 and succ_size < 100) and is_sparse_jac:
                             #     print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
 
-                            lazy = self.checkpoints_bool
-                            # lazy = True
+                            lazy = self.lazy
+
                             backend_op.get_partials(
                                 partials_dict = partials_dict,
                                 partials_block = partials_block,

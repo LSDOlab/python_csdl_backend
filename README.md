@@ -55,6 +55,10 @@ Repository for new CSDL backend.
         ```
     - Significantly reduced memory usage for derivative computation (even without checkpointing) by deallocating partial derivatives and propagated adjoints as they are processed. 
         - **May result in reduced performance for small models compared to previous version.**
+    - Evaluate (some) partial derivatives lazily instead of precomputating them to potentially save memory.
+        ```Python
+        python_csdl_backend.Simulator(Sample(), lazy = True)
+        ```
     - Added new tests with more complicated models. 
         - Run parallel tests using (in root directory):
             ```Bash

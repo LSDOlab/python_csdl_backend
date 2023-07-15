@@ -32,7 +32,8 @@ class Simulator(SimulatorBase):
             visualize_schedule = False,
             checkpoints = False,
             save_vars = set(), # set of variables to have permanent memory allocation. Only applies for checkpointing
-            checkpoint_stride:int = None
+            checkpoint_stride:int = None,
+            lazy = False,
         ):
         """
         CSDL compiler backend. Evaluates model and derivatives.
@@ -76,6 +77,10 @@ class Simulator(SimulatorBase):
 
             checkpoint_stride: int
                 (EXPERIMENTAL) Approximate size of checkpoint intervals. If None, stride is automatically determined.
+
+            lazy: bool
+                (EXPERIMENTAL) If True, (most) derivatives will be computed as they are needed. If False, derivatives that can be precomputed will be precomputed.
+                If checkpointing is being used, derivatives are always computed lazily.
 
         """
         self.display_scripts = display_scripts
@@ -141,6 +146,10 @@ class Simulator(SimulatorBase):
 
         self.comm = comm
         self.checkpoints_bool = checkpoints
+        if self.checkpoints_bool:
+            self.lazy = True
+        else:
+            self.lazy = lazy
         self.system_graph = SystemGraph(
             self.rep,
             mode=mode,
@@ -151,6 +160,7 @@ class Simulator(SimulatorBase):
             opt_bool=self.opt_bool)
         self.system_graph.comm = comm
         self.system_graph.checkpoints_bool = checkpoints
+        self.system_graph.lazy = self.lazy
         # =--=-==-=-=-=-=-=-=-=-=-=-=-=-PARALELIZATION=--=-==-=-=-=-=-=-=-=-=-=-=-=-
         # if comm:
         # from python_csdl_backend.dag_analyzer import create_csdl_like_graph, assign_costs, Scheduler, rep2parallelizable
@@ -513,6 +523,8 @@ class Simulator(SimulatorBase):
         if self.comm:
             eval_vars['comm'] = self.comm
         new_states = self.eval_instructions.execute(eval_vars)
+
+        # analyze_dict_memory(new_states, 'post_run_states')
 
         return new_states
     

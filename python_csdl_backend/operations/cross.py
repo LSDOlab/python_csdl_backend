@@ -32,9 +32,6 @@ class CrossLite(OperationBase):
 
         self.outsize = np.prod(self.shape)
         self.insize = self.outsize
-
-        self.indices = get_array_indices(*self.shape)
-
         self.shape_without_axis = self.shape[:self.axis] + self.shape[self.axis + 1:]
 
         self.ones = np.ones(3, int)
@@ -95,6 +92,7 @@ class CrossLite(OperationBase):
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
         
         if not lazy:
+            self.indices = get_array_indices(*self.shape)
             self.rows = np.einsum(
                 self.einsum_string_rows,
                 self.indices,
@@ -155,15 +153,16 @@ class CrossLite(OperationBase):
                             jac[self.rows, self.cols] = val
 
                     else:
+                        indices = get_array_indices(*self.shape)
                         rows = np.einsum(
                             self.einsum_string_rows,
-                            self.indices,
+                            indices,
                             self.ones,
                         ).flatten()
 
                         cols = np.einsum(
                             self.einsum_string_cols,
-                            self.indices,
+                            indices,
                             self.ones,
                         ).flatten()
 
@@ -173,6 +172,7 @@ class CrossLite(OperationBase):
                             jac = np.zeros((self.outsize, self.insize))
                             jac[rows, cols] = val
 
+                        del indices
                         del rows
                         del cols
                         del val
@@ -218,15 +218,17 @@ class CrossLite(OperationBase):
                             jac = np.zeros((self.outsize, self.insize))
                             jac[self.rows, self.cols] = val
                     else:
+                        indices = get_array_indices(*self.shape)
+
                         rows = np.einsum(
                             self.einsum_string_rows,
-                            self.indices,
+                            indices,
                             self.ones,
                         ).flatten()
 
                         cols = np.einsum(
                             self.einsum_string_cols,
-                            self.indices,
+                            indices,
                             self.ones,
                         ).flatten()
 
@@ -235,7 +237,7 @@ class CrossLite(OperationBase):
                         else:
                             jac = np.zeros((self.outsize, self.insize))
                             jac[rows, cols] = val
-
+                        del indices
                         del rows
                         del cols
                         del val

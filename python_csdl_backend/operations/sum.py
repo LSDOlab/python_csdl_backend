@@ -109,7 +109,6 @@ class SingleTensorSumCompAxisLite(OperationBase):
         self.axes = operation.literals['axes']
 
         self.input_size = np.prod(self.shape)
-        self.val = np.ones(self.input_size)
         # output_shape = np.delete(self.shape, self.axes)
         self.output_shape = self.out_shape_true
 
@@ -126,20 +125,44 @@ class SingleTensorSumCompAxisLite(OperationBase):
         output = key_tuple[0]
         partial_name = partials_dict[key_tuple]['name']
 
-        cols = np.arange(self.input_size)
 
-        rows = np.unravel_index(np.arange(self.input_size), shape=self.shape)
-        rows = np.array(rows)
-        if len(self.shape) > 1:
-            rows = np.delete(np.array(rows), self.axes, axis=0)
-            rows = np.ravel_multi_index(rows, dims=self.output_shape)
-        else:
-            rows = np.zeros(len(cols))
+        if not lazy:
+            cols = np.arange(self.input_size)
 
-        if not is_sparse_jac:
-            vars[partial_name] = sp.csc_matrix((self.val, (rows, cols)), shape=(self.output_size, self.input_size)).toarray()
+            val = np.ones(self.input_size)
+            rows = np.unravel_index(np.arange(self.input_size), shape=self.shape)
+            rows = np.array(rows)
+            if len(self.shape) > 1:
+                rows = np.delete(np.array(rows), self.axes, axis=0)
+                rows = np.ravel_multi_index(rows, dims=self.output_shape)
+            else:
+                rows = np.zeros(len(cols))
+
+            if not is_sparse_jac:
+                vars[partial_name] = sp.csc_matrix((val, (rows, cols)), shape=(self.output_size, self.input_size)).toarray()
+            else:
+                vars[partial_name] = sp.csc_matrix((val, (rows, cols)), shape=(self.output_size, self.input_size))
+
+
         else:
-            vars[partial_name] = sp.csc_matrix((self.val, (rows, cols)), shape=(self.output_size, self.input_size))
+            partials_block.write(f'cols = np.arange({self.input_size})')
+            partials_block.write(f'val = np.ones({self.input_size})')
+            partials_block.write(f'rows = np.unravel_index(np.arange({self.input_size}), shape={self.shape})')
+            partials_block.write(f'rows = np.array(rows)')
+            if len(self.shape) > 1:
+                partials_block.write(f'rows = np.delete(np.array(rows), {self.axes}, axis=0)')
+                partials_block.write(f'rows = np.ravel_multi_index(rows, dims={self.output_shape})')
+            else:
+                partials_block.write(f'rows = np.zeros(len(cols))')
+            
+            if not is_sparse_jac:
+                partials_block.write(f'{partial_name} = sp.csc_matrix((val, (rows, cols)), shape=({self.output_size}, {self.input_size})).toarray()')
+            else:
+                partials_block.write(f'{partial_name} = sp.csc_matrix((val, (rows, cols)), shape=({self.output_size}, {self.input_size}))')
+            
+            partials_block.write(f'del cols')
+            partials_block.write(f'del val')
+            partials_block.write(f'del rows')
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)
