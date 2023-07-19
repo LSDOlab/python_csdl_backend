@@ -122,7 +122,7 @@ from csdl.rep.operation_node import OperationNode
 from csdl.lang.standard_operation import StandardOperation
 from csdl.lang.custom_explicit_operation import CustomExplicitOperation
 
-def predict_time_temp(rep, manual_wait_time = 0.005):
+def predict_time_temp(rep,measure_bool, manual_wait_time = 0.005):
     """
     Predicts the time of a CSDL Model by iterating through each VariableNode, and either calling predict_operation_time or predict_manual_time.
     predict_operation_time is called for operations in the standard library that have a saved surrogate model, while predict_manual_time is 
@@ -142,14 +142,91 @@ def predict_time_temp(rep, manual_wait_time = 0.005):
     """
     graph = rep.flat_graph
     total_time = 0
-    for node in graph:
+    nn = len(graph.nodes)
+    for i, node in enumerate(graph):
+    #    print(f'{i}/{nn}')
        if isinstance (node, OperationNode):
             if isinstance(node.op, StandardOperation):
                 # print('OP')
+                # if measure_bool:
+                #     time = predict_manual_time(rep, node)
+                # else:
                 time = 1e-5
             elif isinstance(node.op, CustomExplicitOperation):
-                time = 1e-4
+                if measure_bool:
+                    time = predict_manual_time(rep, node)
+                else:
+                    time = 1e-4
             else:
                 # print('NOT OP')
-                time = 1e-1
+                if measure_bool:
+                    time = predict_manual_time(rep, node)
+                else:
+                    time = 1e-1
             node.execution_time = time
+
+
+def predict_manual_time (rep, node):
+
+    """
+    Predicts the execution time of a given node in a computation graph by either retrieving it from a cache file or computing it manually.
+
+    Args:
+    rep (GraphRepresentation): A GraphRepresentation of a CSDL Model
+    node (object): A node in the computation graph.
+
+    Returns:
+    t - float: The predicted execution time of the node.
+    """
+    import os
+    import pandas as pd
+    from python_csdl_backend import Simulator
+    import gc
+    from copy import copy 
+
+    pre_saved = False
+    # node_hash = hash (node)
+    # node_hash = sha256 (pickle.dumps (node)).hexdigest ()
+    # node_hash = repr (node)
+    node_hash = str(node.name)
+    if (os.path.isfile ('./timing/cache.csv')):
+        df = pd.read_csv ("./timing/cache.csv")
+        pre_saved = node_hash in list (df['hash'])
+    else:
+        if not os.path.isdir ('./timing'):
+            os.mkdir ('./timing')
+        pre_saved=False
+        template = {'hash':[],
+                    'time':[]}
+        df = pd.DataFrame (template)
+        df.to_csv ('./timing/cache.csv', index=False, columns=['hash', 'time'])
+
+    if (pre_saved):
+        t = df ['time'][list (df['hash']).index (node_hash)]
+        # print (t)
+        # print ("used cache")
+    else:
+        # print ("predicting manual time for: ", str(node.op).split ()[0].split('.')[-1])
+        rep2 = copy(rep)
+        rep2.flat_graph = nx.DiGraph()
+        rep2.flat_graph.add_node(node)
+        rep2.flat_graph.add_edges_from (rep.flat_graph.in_edges (node))
+        rep2.flat_graph.add_edges_from (rep.flat_graph.out_edges (node))
+
+        sim = Simulator(rep2, time_prediction=False)
+        sim.run ()
+
+        import time
+
+        s = time.time()
+        sim.run ()
+        t = time.time() - s
+        data = {'hash':[node_hash],
+                'time':[t]}
+        df = pd.DataFrame(data)
+        df.to_csv('./timing/cache.csv', mode='a', index=False, header=False)
+        del (rep2)
+        del (sim)
+        gc.collect()
+        print('manual')
+    return t

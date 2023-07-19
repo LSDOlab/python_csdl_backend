@@ -226,7 +226,11 @@ class CustomExplicitWrapper():
                 out_shape = self.ordered_out_names[output_name]['shape']
 
                 if isinstance(d_outs[output_name], np.ndarray):
-                    d_outputs[output_name] = d_outs[output_name][row_index, :].reshape(out_shape)
+                    if isinstance(d_outs[output_name], np.matrix):
+                        d_outputs[output_name] = (np.asarray(d_outs[output_name][row_index, :])).reshape(out_shape)
+                    else:
+                        d_outputs[output_name] = d_outs[output_name][row_index, :].reshape(out_shape)
+
                 else:
                     d_outputs[output_name] = (d_outs[output_name][row_index, :].toarray()).reshape(out_shape)
 
@@ -242,6 +246,7 @@ class CustomExplicitWrapper():
 
             # Replace each row of initialized path accumulation
             for input_name in self.ordered_in_names:
+                # print(input_name, accumulated_paths_dict[input_name][row_index, :], d_inputs)
                 accumulated_paths_dict[input_name][row_index, :] = d_inputs[input_name].flatten()
 
         # Return in correct order.

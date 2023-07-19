@@ -114,15 +114,20 @@ class SYNC_POINTS_COARSE(SYNC_BASE):
         num_operations_added = 0
         while available_operations_set:
             
+            current_sync_point = sync_schedule[current_sp]
+
+
             # Set up operations for sync point
             # Use heap to get priority for operation ordering
             # Heapify slower than list traversal???...
             available_operations_temp = []
+            seen_ops_temp = set()
             for op in available_operations_set:
                 longest_time_ahead = o_sdag.nodes[op]['FWA']
                 heapq.heappush(available_operations_temp,(longest_time_ahead, op))
+                o_sdag.nodes[op]['touches_left_temp'] = o_sdag.nodes[op]['touches_left']
+                seen_ops_temp.add(op)
                 # heapq.heappush(available_operations_temp,(sdag.nodes[op]['cost'], op))
-            current_sync_point = sync_schedule[current_sp]
             scheduled_ops = set()
             
             # Perform actual scheduling for this sync point
@@ -150,6 +155,7 @@ class SYNC_POINTS_COARSE(SYNC_BASE):
                             operation = v_in_cluster,
                             rank = v_rank,
                             cost = oo_sdag.nodes[v_in_cluster]['cost'],
+                            cluster=v,
                         )
                         oo_sdag.nodes[v_in_cluster]['rank'] = v_rank
 
@@ -187,24 +193,40 @@ class SYNC_POINTS_COARSE(SYNC_BASE):
                                         to_rank = v_rank,
                                     )
 
+                    # print('\t',v_rank, v)
+                    # update newly available operations in temporary heap
+                    for s in o_sdag.successors(v):
+                        
+                        if s not in seen_ops_temp:
+                            o_sdag.nodes[s]['touches_left_temp'] = o_sdag.nodes[s]['touches_left']
+                        seen_ops_temp.add(s)
+
+                        o_sdag.nodes[s]['touches_left_temp'] = o_sdag.nodes[s]['touches_left_temp'] - 1
+                        if o_sdag.nodes[s]['touches_left_temp'] == 0:
+                            longest_time_ahead = o_sdag.nodes[s]['FWA']
+                            heapq.heappush(available_operations_temp,(longest_time_ahead, s))
+
                 # Terminate sync point scheduling early if load balanced potentially?
                 if current_sync_point.load_balanced:
                     break
 
             # Now remove all scheduled operations
             for op in scheduled_ops:
-                available_operations_set.remove(op)
+                if op in available_operations_set:
+                    available_operations_set.remove(op)
 
                 for s in o_sdag.successors(op):
                     # If all input variables to s have been computed, s is available to compute
                     o_sdag.nodes[s]['touches_left'] = o_sdag.nodes[s]['touches_left'] - 1
                     if o_sdag.nodes[s]['touches_left'] == 0:
-                        available_operations_set.add(s)
+
+                        if s not in scheduled_ops:
+                            available_operations_set.add(s)
 
             num_operations_added += len(scheduled_ops)
-            # TODO: print status option?
-            # print(f"sync point {current_sp} ({num_operations_added}/{num_ops} clusters) ({len(available_operations_set)})")
-            # print(sync_schedule[-1].schedule)
+            print(f"sync point {current_sp} ({num_operations_added}/{num_ops} clusters) ({len(available_operations_set)})")
+            # for op in sync_schedule[-1].schedule:
+            #     print(op)
 
             # Finished synced point
             current_sp += 1
@@ -283,6 +305,7 @@ def build_sync_point_class(NUM_RANKS):
             self.comm_length = 0
             self.max_length = 0
             self.all_operations = set()
+            self.all_operation_clusters = set()
             self.all_operations_ordered = []
             self.all_comms_ordered = []
             self.all_comms = set()
@@ -299,10 +322,11 @@ def build_sync_point_class(NUM_RANKS):
                 # self.communications.append(set())
                 self.open_ranks.add(i)
 
-        def add_operation(self, operation, rank, cost):
+        def add_operation(self, operation, rank, cost, cluster):
             # Add operation to schedule
             self.schedule[rank].add(operation)
             self.all_operations.add(operation)
+            self.all_operation_clusters.add(cluster)
             self.all_operations_ordered.append(operation)
 
             # Update schedule length
@@ -359,10 +383,10 @@ def build_sync_point_class(NUM_RANKS):
             """
 
             # Predecessors of operation cannot be in the current synchronization point
-            pred_ranks = set() 
-            for pred in o_sdag.predecessors(operation):
-                if pred in self.all_operations and (len(pred_ranks) > 1):
-                    return None
+            pred_ranks = set()
+
+            valid_ranks = list(range(NUM_RANKS))
+            for pred in o_sdag.predecessors(operation):            
                 
                 for p_var in o_sdag.edges[(pred,operation)]['edge_variables']:
                     # s_var are variables computed from p that feeds into v
@@ -371,9 +395,15 @@ def build_sync_point_class(NUM_RANKS):
 
                 # if len(pred_ranks) > 1:
                 #     return None
+            for pred in o_sdag.predecessors(operation):  
+                if pred in self.all_operation_clusters:
+                    if (len(pred_ranks) > 1):
+                        return None
+                    elif (len(pred_ranks) == 1):
+                        valid_ranks = [pred_ranks.pop()[0]]    
 
             # Find the best rank
-            for rank in range(NUM_RANKS):
+            for i, rank in enumerate(valid_ranks):
                 # compute communication costs
                 communication_costs = 0
                 for pred_rank in pred_ranks:
@@ -382,8 +412,8 @@ def build_sync_point_class(NUM_RANKS):
                     communication_costs += pred_rank[1]
                 # print(communication_costs)
                 # Find best rank that minimizes start time
-                if rank == 0:
-                    best_rank = 0
+                if i == 0:
+                    best_rank = rank
                     best_start_time = self.schedule_lengths[rank] + communication_costs
                 else:
                     this_rank_start_time = self.schedule_lengths[rank] + communication_costs

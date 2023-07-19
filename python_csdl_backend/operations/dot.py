@@ -109,3 +109,6 @@ class TenDotLite(OperationBase):
                 partials_block.write(f'{partial_name}[{row_name},{col_name}] = {input}.flatten()')
             else:
                 partials_block.write(f'{partial_name} = sp.csc_matrix(({input}.flatten(),({row_name}, {col_name})), shape = ({out_size},{in_size}))')
+
+    def determine_sparse(self):
+        return True

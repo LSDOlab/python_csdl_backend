@@ -258,6 +258,8 @@ def coarsen_graph(
         iter += 1
         longest_path_length(o_sdag)
         cluster_dag_to_dag(o_sdag, weight_max_cutoff)
+
+        prev_num_nodes = len(o_sdag.nodes)
         o_sdag = contract_to_coarsened_dag(o_sdag)
         # if make_plots:
         #     draw(o_sdag, title=f'images/contracted_{iter}_O_SDAG')
@@ -265,6 +267,8 @@ def coarsen_graph(
             print('@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ NOT DAG @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@')
             raise ValueError('NOT DAG')
 
+        if len(o_sdag.nodes) == prev_num_nodes:
+            break
     # Problem size has been reduced:
     # check reduced graph
     # check_coarse_graph(o_sdag, sdag, total_weight)

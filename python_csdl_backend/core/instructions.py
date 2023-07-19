@@ -32,7 +32,7 @@ class SingleInstruction():
         """
         self.script.save()
     # @profile
-    def execute(self, inputs):
+    def execute(self, inputs, sim_name = ''):
         """
         Executes compiled script. Returns dictionary of all local variable values.
 
@@ -72,7 +72,7 @@ class MultiInstructions():
         instructions_dict['variables_to_delete'] = variables_to_delete
         self.ordered_instructions.append(instructions_dict)
 
-    def execute(self, states):
+    def execute(self, states, sim_name = ''):
         locals_temp = states
         for i, instruction_dict in enumerate(self.ordered_instructions):
             instruction = instruction_dict['single_instruction']
@@ -91,7 +91,7 @@ class MultiInstructions():
 
             # gc.collect()
             # -=-=-=-=-=-=-=-=-=-=-=-=-=-= UNCOMMENT FOR MEMORY DEBUGGING -=-=-=-=-=-=-=-=-=-=-=-=-=-=
-            # analyze_dict_memory(locals, instruction.name)
+            # analyze_dict_memory(locals, instruction.name, sim_name = sim_name)
             
         return locals
     

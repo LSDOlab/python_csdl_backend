@@ -76,6 +76,7 @@ class Example3(CustomExplicitOperation):
         # REV:
         # [da db] = [dx dy][px/pa px/pb]
         #                  [py/pa py/pb]
+        print(type(d_outputs['u']), type(d_outputs['z']))
 
         b = inputs['n'].flatten()
         a = inputs['m'].flatten()
@@ -140,14 +141,32 @@ def test_explicit2():
 
 if __name__ == '__main__':
 
+
+    # run_test(
+    #         Explicit2Run(), 
+    #         outs = ['x', 'f2', 'f', 'f3'], 
+    #         ins = ['a', 'b', 'c', 'e'], 
+    #         name='test_explicit2_many',
+    #         vals_dict = {},
+    #         totals_dict = {},
+    #         )
+    # exit()
     # import csdl_om
     # sim = csdl_om.Simulator(ExplicitRun())
-
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
     import python_csdl_backend
-    sim = python_csdl_backend.Simulator(ExplicitRun())
-    sim.eval_instructions.save()
-    sim.run()
+    m = Explicit2Run()
+    # sim = python_csdl_backend.Simulator(m, comm = comm, checkpoints = 0, save_vars='all')
+    # sim.run()
+    # sim.compute_totals(('d', 'f', 'f2', 'f3', 'n', 'x', 'y'), ('a', 'b', 'c', 'e', 'm'))
+    # sim.check_totals(('d', 'f', 'f2', 'f3', 'n', 'x', 'y'), ('a', 'b', 'c', 'e', 'm'))
 
-    print(sim['x'])
-    print(sim['y'])
-    print(sim['f'])
+    sim = python_csdl_backend.Simulator(m,sparsity = 'sparse',comm = comm, checkpoints = False, save_vars='all', display_scripts=1)
+    sim.run()
+    sim.compute_totals(('d', 'f', 'f2', 'f3', 'n', 'x', 'y'), ('a', 'b', 'c', 'e', 'm'))
+    sim.check_totals(('d', 'f', 'f2', 'f3', 'n', 'x', 'y'), ('a', 'b', 'c', 'e', 'm'))
+
+    # print(sim['x'])
+    # print(sim['y'])
+    # print(sim['f'])

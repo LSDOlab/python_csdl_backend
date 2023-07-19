@@ -137,7 +137,7 @@ def set_scaler_array(
 
     return return_array
 
-def analyze_dict_memory(var_dict, name):
+def analyze_dict_memory(var_dict, name, sim_name):
     import scipy.sparse as sp
     import sys
     total_size = 0
@@ -148,6 +148,7 @@ def analyze_dict_memory(var_dict, name):
         'adjoints': 0,
         'other': 0,
     }
+    print(f"=========================================={sim_name}:{name}==========================================")
     for key in var_dict:
         if var_dict[key] is not None:
             var = var_dict[key]
@@ -168,7 +169,10 @@ def analyze_dict_memory(var_dict, name):
                 bytesize = sys.getsizeof(var)
                 total_size += bytesize
 
-            print('\t',key, '\t',vartype, '\t\t',f"{bytesize:,}")
+            if bytesize > 10e6:
+                print('\t',key, '\t',vartype, '\t\t',f"{bytesize:,} (LARGE OBJECT)")        
+            else:
+                print('\t',key, '\t',vartype, '\t\t',f"{bytesize:,}")
             if key[0:2] == 'pv':
                 total_size_dict['partial matrices'] += bytesize
             elif key[0] == 'v':
@@ -182,3 +186,6 @@ def analyze_dict_memory(var_dict, name):
     print(name, 'total size', f"{total_size:,}")
     for var_type in total_size_dict:
         print('-', f'{var_type} size\t', f"{total_size_dict[var_type]:,}")
+
+    print(f"=========================================={sim_name}:{name}==========================================")
+    

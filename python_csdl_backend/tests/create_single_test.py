@@ -35,7 +35,7 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
     model2 = deepcopy(model)
 
     from copy import deepcopy
-
+    print(f'RUNNING CASE: {name=} {sparsity_case=} {comm=} {checkpoints=}')
     if comm is None:
         sim_lite = LiteSimulator(model1,
                                 sparsity=sparsity_case,

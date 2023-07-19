@@ -304,13 +304,18 @@ class SystemGraph(object):
         #     print(snapshot)
 
         # Loop through sorted graph
-        num_vars_allocated = 0
-        num_vars_deallocated = 0
+        total_num_vars = 0
+        total_num_scalars = 0
+        total_keep_vars = 0
+        total_keep_scalars = 0
         for node in nx.topological_sort(self.eval_graph):
 
             if not isinstance(node, OperationNode):
                 # If variable, set state initial value given by user
                 csdl_node = node.var
+
+                total_num_vars += 1
+                total_num_scalars += np.prod(csdl_node.shape)
 
                 # OLD
                 # if isinstance(csdl_node.val, np.ndarray):
@@ -369,6 +374,7 @@ class SystemGraph(object):
                     variable_info['leaf_start'][promoted_id]['shape'] = csdl_node.shape
                     variable_info['leaf_start'][promoted_id]['size'] = np.prod(csdl_node.shape)
                     keep_this_var = True
+                    del_csdl_val = False
                          
                 if self.eval_graph.out_degree(node) == 0:
                     keep_this_var = True
@@ -392,12 +398,14 @@ class SystemGraph(object):
                 # del_csdl_val = False
                 # NEW
                 if keep_this_var:
-                    num_vars_allocated += 1
                     if hasattr(csdl_node, "val"):
                         if isinstance(csdl_node.val, np.ndarray):
                             csdl_node.val = csdl_node.val.astype('float64')
                             if isinstance(csdl_node.val, np.matrix):
                                 csdl_node.val = np.asarray(csdl_node.val).astype('float64')
+                    else:
+                        # print(csdl_node.name, csdl_node)
+                        csdl_node.val = np.ones(csdl_node.shape)
                     # state_vals[node.id] = csdl_node.val.copy()
                     # print(node.id)
                     # print(self.variable_owner_map)
@@ -405,7 +413,6 @@ class SystemGraph(object):
                     self.permanently_allocated_vars.add(node)
                     state_vals[node.id] = csdl_node.val.copy()
                 else:
-                    num_vars_deallocated += 1
                     if hasattr(csdl_node, "val"):
                         if isinstance(csdl_node.val, np.ndarray):
                             csdl_node.val = csdl_node.val.astype('float64')
@@ -420,8 +427,6 @@ class SystemGraph(object):
                     csdl_node.val = None
                     del csdl_node.val
         
-        print(f'{num_vars_allocated}/{num_vars_allocated + num_vars_deallocated} non-snapshot variables allocated')
-
         # import gc
         # gc.collect()
         # total_size = 0
@@ -439,6 +444,11 @@ class SystemGraph(object):
         if self.checkpoints_bool:
             self.schedules = [snapshot['rank schedule'] for snapshot in self.checkpoint_data]
             keep_vars = self.permanently_allocated_vars.union(*[snapshot['rank snapshot'] for snapshot in self.checkpoint_data])
+
+            for var in keep_vars:
+                total_keep_vars += 1
+                total_keep_scalars += np.prod(var.var.shape)
+
             # keep_vars = set().union(*[snapshot['rank snapshot'] for snapshot in self.checkpoint_data])
         else:
             self.schedules = [self.rep.schedule]
@@ -462,6 +472,7 @@ class SystemGraph(object):
             for node in current_schedule:
                 all_op_classes = (StandardOperation, CustomExplicitOperation, ImplicitOperation, BracketedSearchOperation, CustomImplicitOperation)
                 if isinstance(node, PointToPointCall):
+                    num_coms += 1
                     vars = {}
                     node.get_block(eval_block, vars)
                     preeval_vars.update(vars)
@@ -536,10 +547,11 @@ class SystemGraph(object):
                 pass
 
             if self.comm:
+                # self.comm.barrier()
                 if snap_num == len(self.schedules) - 1:
                     print(f'{self.comm.rank} ({num_coms} COMMS/{num_ops} OPS)')
                     eval_block.write('comm.barrier()')
-
+                # exit()
             eval_single_instructions.script.write(eval_block)
             eval_single_instructions.compile()
 
@@ -549,6 +561,9 @@ class SystemGraph(object):
             if self.checkpoints_bool:
                 self.checkpoint_data[snap_num]['single instructions'] = eval_single_instructions
                 self.checkpoint_data[snap_num]['del vars'] = del_vars
+
+        if self.checkpoints_bool:
+            print(f'{total_keep_vars}/{total_num_vars} variables allocated ({total_keep_scalars}/{total_num_scalars} scalars)')
 
         # eval_multi_instrunctions = MultiInstructions('Multi_Instructions')
         # eval_multi_instrunctions.add_single_instruction(eval_single_instructions, set())
@@ -877,7 +892,7 @@ class SystemGraph(object):
 
                                     # Deallocate partials once they are processed
 
-                                    if self.checkpoints_bool:
+                                    if self.lazy:
                                         variable_names_to_delete.add(partials_name)
                                     else:
                                         if not backend_op.linear:
@@ -1101,16 +1116,27 @@ class SystemGraph(object):
                         totals_name = get_deriv_name(out_id, input_id, partials=False)
                         # input_path_name = get_path_name(input_id, out_id=out_id)
                         input_path_name = totals_names[out_id, input_id]
+                        input_size = np.prod(self.unique_to_node[input_id].var.shape)
+
+                        if input_size*output_size > 5000:
+                            use_sparse = True
+                        else:
+                            use_sparse = False
 
                         if input_path_name in initialized_paths:  # case 1:
                             rev_block.write(f'{totals_name} = {input_path_name}.copy()')
                         elif input_id == out_id:  # case 2:
                             rev_block.comment(f'{totals_name} = identity')
-                            prerev_vars[totals_name] = np.eye(output_size)
+                            if use_sparse:
+                                prerev_vars[totals_name] = sp.eye(output_size, format = 'csr')
+                            else:
+                                prerev_vars[totals_name] = np.eye(output_size)
                         else:  # case 3:
                             rev_block.comment(f'{totals_name} = zero')
-                            input_size = np.prod(self.unique_to_node[input_id].var.shape)
-                            prerev_vars[totals_name] = np.zeros((output_size, input_size))
+                            if use_sparse:
+                                prerev_vars[totals_name] = sp.csr_array((output_size, input_size))
+                            else:
+                                prerev_vars[totals_name] = np.zeros((output_size, input_size))
 
             # Compile single instruction
             rev_single_instructions.script.write(rev_block)

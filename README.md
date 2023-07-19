@@ -72,19 +72,11 @@ Repository for new CSDL backend.
 
 # Installation
 
-Install with `pip install -e .` in root directory. run `pytest` in root directory.
+Install with `pip install -e .` in root directory. 
 
-Requires most recent `csdl`: https://github.com/LSDOlab/csdl
+Run unit tests via `pytest` in root directory.
 
-Requires most recent `csdl_om`: 
-https://github.com/LSDOlab/csdl_om 
--  Needed to prevent stray `import csdl_om` statements throwing an error
-- NOTE: this version of `csdl_om` does not work with caddee. To switch to `csdl_om`, follow the following instructions.
-
-To go back to a working version of `csdl_om`:
-- in CSDL root: `git checkout dev_caddee`
-- in CSDL_OM root:  `git checkout dev_caddee`
-- (`git checkout master` in both to go back to most recent commit)
+Requires `csdl`: https://github.com/LSDOlab/csdl
 
 # Features
 List of features implemented:

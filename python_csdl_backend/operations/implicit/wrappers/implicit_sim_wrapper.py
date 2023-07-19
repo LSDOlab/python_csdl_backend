@@ -13,7 +13,12 @@ class ImplicitSimWrapper(ImplicitWrapperBase):
         expose: List[str] = op.expose  # EXPOSED VARIABLES
 
         # create simulator of implicit model
-        self.sim = Simulator(op.rep)
+
+        implicit_checkpoints = 0
+        if implicit_checkpoints:
+            self.sim = Simulator(op.rep, checkpoints = 1, save_vars=set().union(set(out_res_map.keys()), set(out_in_map.keys()), set(res_out_map.keys()), set(expose)))
+        else:
+            self.sim = Simulator(op.rep)
 
         # dictionary of information on state
         # Try to keep as many things out of memory after init

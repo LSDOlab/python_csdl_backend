@@ -22,6 +22,7 @@ class Simulator(SimulatorBase):
     def __init__(
             self,
             representation,
+            name:str = '',
             mode='rev',
             analytics=False,
             sparsity='auto',
@@ -42,6 +43,9 @@ class Simulator(SimulatorBase):
         -----------
             representation: GraphRepresentation (accepts csdl Models as well for now)
                 Representation of the CSDL model to evaluate.
+
+            name: str
+                Name of the simulator. Used for debugging.
 
             mode: str
                 String specifying which method to compute derivatives. (accepts only 'rev')
@@ -81,13 +85,13 @@ class Simulator(SimulatorBase):
             lazy: bool
                 (EXPERIMENTAL) If True, (most) derivatives will be computed as they are needed. If False, derivatives that can be precomputed will be precomputed.
                 If checkpointing is being used, derivatives are always computed lazily.
-
         """
         self.display_scripts = display_scripts
         self.recorder = None
         if not isinstance(root, bool):
             raise TypeError('root argument must be True or False.')
         self.root = root
+        self.name = name
 
         # check modes
         self.mode = mode
@@ -133,7 +137,10 @@ class Simulator(SimulatorBase):
         # :::::ANALYTICS:::::
         if self.analytics:
             print('PROCESSING GRAPH...')
-            filename = 'SUMMARY_GRAPH.txt'
+            if self.name == '':
+                filename = 'SUMMARY_GRAPH.txt'
+            else:
+                filename = 'SUMMARY_GRAPH_{self.name}.txt'
         # :::::ANALYTICS:::::
 
         # model and graph creation
@@ -142,7 +149,8 @@ class Simulator(SimulatorBase):
         # predict_time(self.rep)
 
         from python_csdl_backend.dag_analyzer.utils import predict_time_temp
-        predict_time_temp(self.rep)
+        # predict_time_temp(self.rep, time_prediction) #TODO: Change later
+        predict_time_temp(self.rep, False)
 
         self.comm = comm
         self.checkpoints_bool = checkpoints
@@ -161,6 +169,7 @@ class Simulator(SimulatorBase):
         self.system_graph.comm = comm
         self.system_graph.checkpoints_bool = checkpoints
         self.system_graph.lazy = self.lazy
+        self.system_graph.name = name
         # =--=-==-=-=-=-=-=-=-=-=-=-=-=-PARALELIZATION=--=-==-=-=-=-=-=-=-=-=-=-=-=-
         # if comm:
         # from python_csdl_backend.dag_analyzer import create_csdl_like_graph, assign_costs, Scheduler, rep2parallelizable
@@ -188,6 +197,8 @@ class Simulator(SimulatorBase):
             # 'Standard Non-Blocking': MTA_PT2PT_ARB(),
             'Sync Points': SYNC_POINTS(priority = 'shortest before'),
             'Sync Points Balance': SYNC_POINTS_BALANCE(priority = 'shortest before'),
+            # 'Sync Points Coarse': SYNC_POINTS_COARSE(priority = 'furthest ahead'),
+            # 'Sync Points Old': SYNC_POINTS_COARSE_OLD(priority = 'shortest before'),
             'Sync Points Coarse': SYNC_POINTS_COARSE(priority = 'shortest before'),
         }
         if algorithm not in alg_map:
@@ -195,7 +206,11 @@ class Simulator(SimulatorBase):
             raise ValueError('algorithm must be specified as one of the following: ' + str(possible_algs))
         
         # Graph partitioning:
-        PARTITION_TYPE = alg_map[algorithm]
+        if self.comm is not None:
+            PARTITION_TYPE = alg_map[algorithm]
+        else:
+            PARTITION_TYPE = alg_map['Standard Blocking']
+    
         PROFILE = 0
         MAKE_PLOTS = 0
         # MAKE_PLOTS = 1
@@ -288,6 +303,7 @@ class Simulator(SimulatorBase):
         del raw_variable_owner_map
 
         self.rep.schedule = schedule_new
+
         # else:
         #     self.rep.schedule =[]
         #     self.system_graph.variable_owner_map_full = {}
@@ -323,6 +339,7 @@ class Simulator(SimulatorBase):
         # prepare design variable vectors
         # TODO: uncomment
         if self.opt_bool:
+        # if self.opt_bool and (time_prediction):
             self.process_optimization_vars()
 
             if self.checkpoints_bool:
@@ -359,7 +376,7 @@ class Simulator(SimulatorBase):
         
         # profiler.disable()
         # profiler.dump_stats('output')
-        # analyze_dict_memory(self.preeval_vars, 'precomputed evaluation vars')
+        # analyze_dict_memory(self.preeval_vars, 'precomputed evaluation vars',sim_name = self.name)
 
         # self.eval_instructions.script.write(eval_block)
         # self.eval_instructions.compile()
@@ -381,6 +398,7 @@ class Simulator(SimulatorBase):
         # if mode == 'rev':
         #     self.graph_reversed = self.eval_graph.reverse()
 
+        del self.rep
         # # TODO: REMOVE!!!!!!!!!
         # self.vec_num_f_calls = []
         # self.vec_num_vectorized_f_calls = []
@@ -430,6 +448,10 @@ class Simulator(SimulatorBase):
 
         # write the computation steps
         # adj_instructions.script.write(rev_script)
+        
+        # if self.name == 'system':
+        # analyze_dict_memory(pre_vars, 'precomputed reverse vars', sim_name = self.name)
+        #     pass
 
         # Save/compile
         if self.display_scripts:
@@ -522,7 +544,7 @@ class Simulator(SimulatorBase):
         eval_vars = {**state_values, **self.preeval_vars}
         if self.comm:
             eval_vars['comm'] = self.comm
-        new_states = self.eval_instructions.execute(eval_vars)
+        new_states = self.eval_instructions.execute(eval_vars,sim_name = self.name)
 
         # analyze_dict_memory(new_states, 'post_run_states')
 
@@ -591,9 +613,9 @@ class Simulator(SimulatorBase):
 
         if self.checkpoints_bool:
             # OLD
-            totals_dict = adj_exec.execute({**self.state_vals.state_values, **vars, **self.preeval_vars})
+            totals_dict = adj_exec.execute({**self.state_vals.state_values, **vars, **self.preeval_vars} ,sim_name = self.name)
         else:
-            totals_dict = adj_exec.execute({**self.state_vals.state_values, **vars})
+            totals_dict = adj_exec.execute({**self.state_vals.state_values, **vars},sim_name = self.name)
         # print('preeval_vars after',len(vars))
 
         # from python_csdl_backend.utils.general_utils import analyze_dict_memory

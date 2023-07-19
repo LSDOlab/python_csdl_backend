@@ -147,4 +147,12 @@ def test_parallel_implicit():
         totals_dict=totals_dict)
     
 if __name__ == '__main__':
-    test_parallel_implicit()
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+
+    import python_csdl_backend
+    m, o, i = get_model()
+    sim = python_csdl_backend.Simulator(m, comm = comm, visualize_schedule=0, display_scripts=1)
+    sim.run()
+    print(sim['x_1_0'])
+    # test_parallel_implicit()

@@ -67,11 +67,14 @@ class OperationBase():
         outputs_string = list_to_argument_str(list(nx_outputs.keys()))
         inputs_string_lang = list_to_argument_str([self.get_lang_input(x) for x in nx_inputs.keys()])
         outputs_string_lang = list_to_argument_str([self.get_lang_output(x) for x in nx_outputs.keys()])
+        inputs_shapes = list_to_argument_str([str(lang_input_var.shape) for lang_input_var in self.input_csdl_to_rep])
+        outputs_shapes = list_to_argument_str([str(successor.var.shape) for successor in self.nx_outputs_dict.values()])
         for an_output in nx_outputs.values():
             self.full_namespace = an_output.unpromoted_namespace
         self.op_summary_block.comment(f'op {self.name}')
-        self.op_summary_block.comment(f'REP:  {inputs_string} --> {outputs_string}')
+        # self.op_summary_block.comment(f'REP:  {inputs_string} --> {outputs_string}')
         self.op_summary_block.comment(f'LANG: {inputs_string_lang} --> {outputs_string_lang}')
+        self.op_summary_block.comment(f'SHAPES: {inputs_shapes} --> {outputs_shapes}')
         self.op_summary_block.comment(f'full namespace: {self.full_namespace}')
 
     def map_predecessors(self):
