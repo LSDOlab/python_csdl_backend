@@ -35,6 +35,7 @@ class Simulator(SimulatorBase):
             save_vars = set(), # set of variables to have permanent memory allocation. Only applies for checkpointing
             checkpoint_stride:int = None,
             lazy = False,
+            dashboard = None,
         ):
         """
         CSDL compiler backend. Evaluates model and derivatives.
@@ -87,7 +88,6 @@ class Simulator(SimulatorBase):
                 If checkpointing is being used, derivatives are always computed lazily.
         """
         self.display_scripts = display_scripts
-        self.recorder = None
         if not isinstance(root, bool):
             raise TypeError('root argument must be True or False.')
         self.root = root
@@ -397,6 +397,20 @@ class Simulator(SimulatorBase):
         self.derivative_instructions_map = {}
         # if mode == 'rev':
         #     self.graph_reversed = self.eval_graph.reverse()
+        self.recorder = None
+        if dashboard is not None:
+            self.this_rank_records = True
+
+            if self.comm is not None:
+                if self.comm.rank != 0:
+                    self.this_rank_records = False
+    
+            if self.this_rank_records:
+                self.recorder = dashboard.get_recorder()
+
+                # save_dict = {}
+                for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
+                    self.check_variable_existence(var_name)
 
         del self.rep
         # # TODO: REMOVE!!!!!!!!!
@@ -494,6 +508,7 @@ class Simulator(SimulatorBase):
                 # start = time.time()
                 save_dict = {}
                 for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
+                    # print(new_states[self._find_unique_id(var_name)])
                     save_dict[var_name] = new_states[self._find_unique_id(var_name)]
 
                 self.recorder.record(save_dict, 'simulator')
@@ -1303,18 +1318,18 @@ class Simulator(SimulatorBase):
                 0.0,
                 decimal=5)
 
-    def add_recorder(self, recorder):
-        """
-        For dashboard.
-        """
-        self.recorder = recorder
+    # def add_recorder(self, recorder):
+    #     """
+    #     For dashboard.
+    #     """
+    #     self.recorder = recorder
 
-        # save_dict = {}
-        for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
-            self.check_variable_existence(var_name)
-            # save_dict[var_name] = self.state_vals[self._find_unique_id(var_name)]
+    #     # save_dict = {}
+    #     for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
+    #         self.check_variable_existence(var_name)
+    #         # save_dict[var_name] = self.state_vals[self._find_unique_id(var_name)]
 
-        # self.recorder.record(save_dict, 'simulator')
+    #     # self.recorder.record(save_dict, 'simulator')
 
     def check_if_optimization(self, opt_bool):
         """

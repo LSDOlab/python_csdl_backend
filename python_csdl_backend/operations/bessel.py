@@ -25,6 +25,8 @@ class BesselLite(OperationBase):
         self.output_name = output_name_id
         self.kind = operation.literals['kind']
         self.order = operation.literals['order']
+        self.order_is_array = isinstance(self.order, np.ndarray)
+        self.order_name = f'{self.name}_order'
         self.func_name = self.name
         self.func_name_partials = self.name+"_partial_func"
 
@@ -39,7 +41,12 @@ class BesselLite(OperationBase):
         # print (self.order)
         # print (self.kind)
         # print (vars[self.func_name])
-        eval_block.write(f'{self.output_name}={self.func_name}({self.order},{self.input_name})')
+        if self.order_is_array:
+            vars[self.order_name] = self.order
+            eval_block.write(f'{self.output_name}={self.func_name}({self.order_name},{self.input_name})')
+        else:
+            eval_block.write(f'{self.output_name}={self.func_name}({self.order},{self.input_name})')
+
         # eval_block.write(f'{self.output_name} = np.sin({self.input_name})')
 
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
@@ -64,7 +71,11 @@ class BesselLite(OperationBase):
         elif self.kind == 2:
             from scipy.special import yvp
             vars[self.func_name_partials] = yvp
-        partials_block.write(f'{partial_name} = {self.func_name_partials}({self.order},{self.input_name}).flatten()')
+        if self.order_is_array:
+            vars[self.order_name] = self.order
+            partials_block.write(f'{partial_name} = {self.func_name_partials}({self.order_name},{self.input_name}).flatten()')
+        else:
+            partials_block.write(f'{partial_name} = {self.func_name_partials}({self.order},{self.input_name}).flatten()')
 
     def determine_sparse(self):
         return self.determine_sparse_default_elementwise(self.input_size)

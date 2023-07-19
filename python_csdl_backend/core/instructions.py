@@ -2,6 +2,7 @@ from python_csdl_backend.core.codeblock import CodeBlock
 from python_csdl_backend.utils.general_utils import analyze_dict_memory
 import numpy as np
 import scipy.sparse as sp
+import scipy
 import gc
 
 class SingleInstruction():
@@ -45,6 +46,7 @@ class SingleInstruction():
         globals = {}  # Not entirely sure what this is.
         inputs['np'] = np
         inputs['sp'] = sp
+        # inputs['scipy'] = scipy
 
         locals = inputs  # Set local variables
 
