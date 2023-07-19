@@ -1,5 +1,4 @@
 import csdl
-from pytest_easyMPI import mpi_parallel
 
 
 class SinSample(csdl.Model):
