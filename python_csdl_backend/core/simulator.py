@@ -140,7 +140,7 @@ class Simulator(SimulatorBase):
             if self.name == '':
                 filename = 'SUMMARY_GRAPH.txt'
             else:
-                filename = 'SUMMARY_GRAPH_{self.name}.txt'
+                filename = f'SUMMARY_GRAPH_{self.name}.txt'
         # :::::ANALYTICS:::::
 
         # model and graph creation
@@ -1142,7 +1142,7 @@ class Simulator(SimulatorBase):
             shape = dv_dict['shape']
             new_val = x[i_lower:i_upper]/scaler
             dv_id = self._find_unique_id(dv_name)
-
+            print(dv_id, new_val)
             self.state_vals[dv_id] = new_val.reshape(shape)
 
     # @profile
