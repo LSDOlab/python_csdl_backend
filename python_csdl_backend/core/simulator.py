@@ -23,7 +23,8 @@ class Simulator(SimulatorBase):
                  analytics=False,
                  sparsity='auto',
                  display_scripts=False,
-                 root=True):
+                 root=True,
+                 user_defined_name=''):
         """
         CSDL compiler backend. Evaluates model and derivatives.
 
@@ -100,7 +101,7 @@ class Simulator(SimulatorBase):
         # :::::ANALYTICS:::::
         if self.analytics:
             print('PROCESSING GRAPH...')
-            filename = 'SUMMARY_GRAPH.txt'
+            filename = f'SUMMARY_GRAPH_{user_defined_name}.txt'
         # :::::ANALYTICS:::::
 
         # model and graph creation
@@ -817,7 +818,7 @@ class Simulator(SimulatorBase):
             shape = dv_dict['shape']
             new_val = x[i_lower:i_upper]/scaler
             dv_id = self._find_unique_id(dv_name)
-
+            print(dv_id, new_val)
             self.state_vals[dv_id] = new_val.reshape(shape)
 
     def compute_total_derivatives(self, check_failure=False):

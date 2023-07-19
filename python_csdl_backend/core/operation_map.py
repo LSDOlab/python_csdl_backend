@@ -42,6 +42,9 @@ from csdl.operations.max import max
 # from csdl.operations.inner import inner
 from csdl.operations.average import average
 from csdl.operations.min import min
+from csdl.operations.bessel import bessel
+from csdl.operations.hankel import hankel
+
 
 
 from csdl import CustomExplicitOperation
@@ -92,7 +95,13 @@ from python_csdl_backend.operations.max import get_max_lite
 # from python_csdl_backend.operations.inner import get_inner_lite
 from python_csdl_backend.operations.average import get_average_lite
 from python_csdl_backend.operations.min import get_min_lite
+from python_csdl_backend.operations.bessel import get_bessel_lite
+from python_csdl_backend.operations.hankel import get_hankel_lite
 
+try: 
+    from csdl import its_shotime
+except:
+    pass
 
 from python_csdl_backend.operations.implicit.implicit_operation import get_implicit_lite, get_implicit_custom_lite
 from python_csdl_backend.operations.custom_explicit.custom_explicit import get_custom_explicit_lite
@@ -143,6 +152,8 @@ csdl_to_back_map = {
     max : get_max_lite,
     min : get_min_lite,
     average : get_average_lite,
+    bessel: get_bessel_lite,
+    hankel: get_hankel_lite,
     # inner : get_inner_lite,
 }
 
