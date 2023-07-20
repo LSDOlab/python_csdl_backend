@@ -148,9 +148,9 @@ def generate_schedule_plot(estimated_times, full_schedule, checkpoint_data):
         for i in range(len(heights)):
             height = heights[i]
             
-            if ('GET' in schedule[i]):
+            if ('GET_/' in schedule[i]):
                 operation_type = 'comm'
-            elif ('SEND' in schedule[i]):
+            elif ('SEND_/' in schedule[i]):
                 operation_type = 'comm'
                 arrow_y = bottoms[i] + (height)/2
                 split_string = schedule[i].split("/")
@@ -272,16 +272,17 @@ def check_schedule(all_schedules, estimated_timeline, sdag):
         # print(f'\t length: {len(schedule)}')
 
         for operation in schedule:
-            if ('SsEND' in operation) or ('SEND' in operation) or ('GET' in operation) or ('WAITING' in operation) or ('IRECV' in operation) or ('W/F' in operation) or ('irecvwait' in operation):
+            if ('SEND_/' in operation) or ('GET_/' in operation) or ('WAITING_for' in operation):
                 
                 if operation in communication_ops:
                     raise ValueError(f'operation {operation} already in communication_ops')
                 
                 communication_ops.add(operation)
 
+                print(operation)
                 if 'SEND' in operation:
                     num_sends += 1
-                elif 'GET' in operation:
+                elif 'GET_/' in operation:
                     num_recvs += 1
 
                 continue
@@ -352,9 +353,9 @@ def determine_checkpoints(estimated_timeline, schedules, graph, checkpoint_strid
         for i, operation in enumerate(schedules[rank]):
             if 'WAIT' in operation:
                 continue
-            if 'SEND' in operation:
+            if 'SEND_/' in operation:
                 total_sends += 1
-            elif 'GET' in operation:
+            elif 'GET_/' in operation:
                 total_recvs += 1
             all_scheduled_ops.add(operation)
             task_list.append((operation, estimated_timeline[rank][i], estimated_timeline[rank][i+1]))
@@ -453,9 +454,9 @@ def determine_checkpoints(estimated_timeline, schedules, graph, checkpoint_strid
                 num_recvs = 0
                 latest_tasks = mapped_end_times[end_time]['latest tasks']
                 for op in latest_tasks:
-                    if 'SEND' in op:
+                    if 'SEND_/' in op:
                         num_sends += 1
-                    elif 'GET' in op:
+                    elif 'GET_/' in op:
                         num_recvs += 1
                 if num_sends == num_recvs:
                     best_potential_idle_time = idle_time
@@ -573,9 +574,9 @@ def determine_checkpoints(estimated_timeline, schedules, graph, checkpoint_strid
         current_snapshot_subgraph_operations = set()
         for operation in snapshot['snapshot operations']:
             # print(operation)
-            if 'SEND' in operation:
+            if 'SEND_/' in operation:
                 num_sends += 1
-            elif 'GET' in operation:
+            elif 'GET_/' in operation:
                 num_recvs += 1
 
             previous_operations.add(operation)

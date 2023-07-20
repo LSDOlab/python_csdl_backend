@@ -359,6 +359,45 @@ class Simulator(SimulatorBase):
                     self.check_variable_existence(var_name)
                     unique_id = self._find_unique_id(var_name)
                     self.system_graph.update_permanent_vars(self._get_unique_node(unique_id))
+        
+        # For dashboard:
+        self.record = False
+        self.this_simulator_records = True
+        self.record_variables = set()
+        if dashboard is not None:
+            self.record = True
+
+            # if parallel, only the zeroth rank will do the saving operations
+            if self.comm is not None:
+                if self.comm.rank != 0:
+                    self.this_simulator_records = False
+
+            # If this simulator is the one that records, get the recording variables
+            if self.this_simulator_records:
+                self.recorder = dashboard.get_recorder()
+                record_variables = []
+                # save_dict = {}
+                for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
+                    self.check_variable_existence(var_name)
+
+                    # For dashboard:
+                    record_variables.append(var_name)
+
+            # For the other simulators, get the recording variables from the zeroth rank
+            if self.comm is not None:
+                if self.comm.size > 1:
+                    if not self.this_simulator_records:
+                        record_variables = None
+                    record_variables = self.comm.bcast(record_variables, root=0)
+
+            self.record_variables = record_variables
+
+            # Checkpointing may deallocate the variables at the end of the run, 
+            # so we need to make sure that the variables we want to record are saved
+            if self.checkpoints_bool:
+                 for var_name in self.record_variables:
+                    unique_id = self._find_unique_id(var_name)
+                    self.system_graph.update_permanent_vars(self._get_unique_node(unique_id))
 
         #  ----------- create model evaluation script -----------
         # if comm:
@@ -397,20 +436,8 @@ class Simulator(SimulatorBase):
         self.derivative_instructions_map = {}
         # if mode == 'rev':
         #     self.graph_reversed = self.eval_graph.reverse()
-        self.recorder = None
-        if dashboard is not None:
-            self.this_rank_records = True
+        
 
-            if self.comm is not None:
-                if self.comm.rank != 0:
-                    self.this_rank_records = False
-    
-            if self.this_rank_records:
-                self.recorder = dashboard.get_recorder()
-
-                # save_dict = {}
-                for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
-                    self.check_variable_existence(var_name)
 
         del self.rep
         # # TODO: REMOVE!!!!!!!!!
@@ -503,29 +530,33 @@ class Simulator(SimulatorBase):
 
         self.ran_bool = True
 
-        if self.recorder:
-            if save:
-                # start = time.time()
-                save_dict = {}
-                for var_name in self.recorder.dash_instance.vars['simulator']['var_names']:
-                    # print(new_states[self._find_unique_id(var_name)])
-                    save_dict[var_name] = new_states[self._find_unique_id(var_name)]
+            # print('RECORDING TIME:', time.time() - start)
 
-                self.recorder.record(save_dict, 'simulator')
-                # print('RECORDING TIME:', time.time() - start)
-
-        num_size = 0
         for key in self.state_vals.state_values:
             self.state_vals[key] = new_states[key]
 
-            if new_states[key] is None:
-                size = 0
-            else:
-                size = new_states[key].size
-            # print(key, size)
-            num_size += size
-        # print(num_size)
-        # exit()
+        if self.record and save:
+            # start = time.time()
+
+            if self.this_simulator_records:
+                save_dict = {}
+    
+            for var_name in self.record_variables:
+                # print(new_states[self._find_unique_id(var_name)])
+                # save_dict[var_name] = new_states[self._find_unique_id(var_name)]
+                temp = self.state_vals[self._find_unique_id(var_name)]
+
+                if self.this_simulator_records:
+                    if temp is None:
+                        raise ValueError(f'dev error: Variable {var_name} is None. Cannot save to dashboard.')
+                    
+                        if self.comm is not None:
+                            self.comm.Abort()
+                    save_dict[var_name] = temp
+
+            if self.this_simulator_records:
+                self.recorder.record(save_dict, 'simulator')
+        
         if check_failure:
             return failure_flag
     
@@ -1157,7 +1188,6 @@ class Simulator(SimulatorBase):
             shape = dv_dict['shape']
             new_val = x[i_lower:i_upper]/scaler
             dv_id = self._find_unique_id(dv_name)
-            print(dv_id, new_val)
             self.state_vals[dv_id] = new_val.reshape(shape)
 
     # @profile

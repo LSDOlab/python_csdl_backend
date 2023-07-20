@@ -78,6 +78,7 @@ class EinSumLite(OperationBase):
         operation_aslist = self.operation_aslist
 
         self.I = []
+        # print(self.op_summary_block.to_string())
         for in_name_index, in_name in enumerate(zip(self.in_names)):
             if in_name in completed_in_names:
                 continue
@@ -102,8 +103,7 @@ class EinSumLite(OperationBase):
 
             I = np.zeros(I_shape)
             I[I_ind] += 1
-            # print(self.op_summary_block.to_string())
-            # print(I.size, I.nbytes)
+            # print(f'{I.size:,}', f'\t{I.nbytes:,}')
 
             self.I.append(I)
 

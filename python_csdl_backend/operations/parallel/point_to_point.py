@@ -2,7 +2,7 @@ import numpy as np
 
 def get_comm_node(in_str, rank, system_graph):
     # print(in_str)
-    if ('SEND' in in_str):
+    if ('SEND_/' in in_str):
         split_string = in_str.split("/")
         var_id = split_string[1]
         tag_int = name_to_int(var_id)
@@ -14,7 +14,7 @@ def get_comm_node(in_str, rank, system_graph):
             var=system_graph.unique_to_node[var_id],
             tag=tag_int,
         )
-    elif ('GET' in in_str):
+    elif ('GET_/' in in_str):
         split_string = in_str.split("/")
         var_id= split_string[1]
         tag_int = name_to_int(var_id)

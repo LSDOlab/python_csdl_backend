@@ -146,3 +146,9 @@ class CodeBlock():
         file_name = self.name + '.py'
         with open(file_name, "w") as text_file:
             text_file.write(self.to_string())
+
+    def purge_strings(self):
+        """
+        deletes all strings in sub_blocks
+        """
+        self.sub_blocks = []
