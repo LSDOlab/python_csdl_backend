@@ -62,6 +62,7 @@ class ImplicitLite(OperationBase):
         name = f'{name}_{op_name}'
         operation.properties = {}
         operation.properties['elementwise'] = False
+        operation.properties['linear'] = False
         super().__init__(operation, nx_inputs, nx_outputs, name, **kwargs)
 
         # set up user input names in order and user output names in order

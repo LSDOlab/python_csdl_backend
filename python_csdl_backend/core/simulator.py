@@ -111,7 +111,7 @@ class Simulator(SimulatorBase):
         # Set input variables:
         # Initialize state values dictionary
         # state_vals[<unique_name>] = <np.ndarray()>
-        self.state_vals = {}
+        # self.state_vals = {}
 
         # process design variables, objectives, and constraints
         self.opt_bool = False  # Boolean on whether we are running an optimization problem or not
@@ -584,14 +584,16 @@ class Simulator(SimulatorBase):
         # except:
         #     pass
 
-        # if remember_implicit_states:
-        #     self.remember_implicit_states()
+        if remember_implicit_states:
+            self.remember_implicit_states()
             # print("remember")
         eval_vars = {**state_values, **self.preeval_vars}
         if self.comm:
             eval_vars['comm'] = self.comm
         new_states = self.eval_instructions.execute(eval_vars,sim_name = self.name)
 
+        # import gc
+        # gc.collect()
         # analyze_dict_memory(new_states, 'post_run_states')
 
         return new_states
@@ -1105,6 +1107,7 @@ class Simulator(SimulatorBase):
                     owner_rank = self.system_graph.variable_owner_map[output_id]
                     var = self.comm.bcast(new_states[output_id], root = owner_rank)
                     output_val_perturbed = var.flatten()
+                    self.comm.barrier()
                 else:
 
                     output_val_perturbed = new_states[output_id].flatten()
@@ -1113,8 +1116,9 @@ class Simulator(SimulatorBase):
                 output_check_derivative = (output_val_perturbed - output_val_original)/delta
 
                 for row_index in range(output_size):
-                    fd_jacs[(output_name, input_name)][row_index, col_index] = output_check_derivative[row_index]
-
+                    temp = output_check_derivative[row_index]
+                    fd_jacs[(output_name, input_name)][row_index, col_index] = temp
+                
         return fd_jacs
 
     def process_optimization_vars(self):
@@ -1374,7 +1378,7 @@ class Simulator(SimulatorBase):
         sets the initial guesses of all implicit operations as the current solved state
         """
         for state_id, guess_id in self.system_graph.all_state_ids_to_guess.items():
-            self.state_vals[guess_id] = self.state_vals[state_id]
+            self.state_vals[guess_id] = self.state_vals.get_single(state_id)
 
     # def find_variables_between(self, source_name, target_name):
     #     """

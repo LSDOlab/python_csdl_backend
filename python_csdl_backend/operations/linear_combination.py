@@ -24,7 +24,6 @@ class LinearCombinationLite(OperationBase):
 
         self.out_name = self.operation.outs[0].name
         self.shape = self.operation.outs[0].shape
-        self.linear = True
 
     def get_evaluation(self, eval_block, vars):
 

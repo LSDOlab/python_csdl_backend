@@ -29,7 +29,7 @@ class OperationBase():
         self.jac_is_function = False
         self.op_summary_block = CodeBlock(add_name=False)
         self.elementwise = operation.properties['elementwise']
-        self.linear = False
+        self.linear = operation.properties['linear']
 
         # map to landuage variable and representation variable
         self.input_csdl_to_rep = {}

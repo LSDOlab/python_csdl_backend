@@ -33,7 +33,7 @@ class PrintVarLite(OperationBase):
         eval_block.write(f'print(\'printing \', \'{self.input_name} ({self.in_name})\')')
         # eval_block.write(f'print(\'full name: \',\'{self.full_namespace}.{self.in_name}\')')
         eval_block.write(f'print({self.input_name})')
-        eval_block.write(f'{self.out_name} = {self.input_name}')
+        # eval_block.write(f'{self.out_name} = {self.input_name}')
 
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 

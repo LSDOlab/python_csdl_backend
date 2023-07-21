@@ -48,7 +48,6 @@ class ReorderAxesLite(OperationBase):
 
         self.out_size = np.prod(out_shape)
         self.in_size = np.prod(in_shape)
-        self.linear = True
 
     def get_evaluation(self, eval_block, vars):
 

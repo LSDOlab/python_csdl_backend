@@ -24,7 +24,6 @@ class SparsematmatLite(OperationBase):
         self.sparse_mat = operation.literals['sparse_mat']
         self.in_name = self.get_input_id(in_name)
         self.out_name = self.get_output_id(out_name)
-        self.linear = True
         self.sparse_mat_name = self.name+'_mat'
 
     def get_evaluation(self, eval_block, vars):

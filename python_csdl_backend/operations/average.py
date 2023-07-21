@@ -31,7 +31,6 @@ class SingleTensorAverageLite(OperationBase):
         self.out_shape = operation.outs[0].shape
         self.axes = operation.literals['axes']
         # self.val = operation.dependencies[0].val
-        self.linear = True
 
         in_name = self.in_name
         shape = self.shape

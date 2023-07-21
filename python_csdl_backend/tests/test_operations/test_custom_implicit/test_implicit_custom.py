@@ -118,7 +118,8 @@ def test_implicit_custom_nlbgs():
 
 
 if __name__ == '__main__':
-
+    test_implicit_custom_newton()
+    exit()
     if 1:
         import python_csdl_backend
 

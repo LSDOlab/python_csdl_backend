@@ -32,7 +32,6 @@ class IndexedPassthroughLite(OperationBase):
         # print(self.out_name)
         # print(name)å
         # print(self.indices)
-        self.linear = True
 
     def get_evaluation(self, eval_block, vars):
 

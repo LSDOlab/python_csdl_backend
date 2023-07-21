@@ -44,6 +44,12 @@ class StateManager():
             var = self.comm.bcast(self.state_values[id], root = owner_rank)
             return var
 
+    def get_single(self, id):
+        """
+        return only the local value for that rank
+        """
+        return self.state_values[id]
+
     def __setitem__(self, id, val):
         self.check_id(id)
         if self.comm is None:

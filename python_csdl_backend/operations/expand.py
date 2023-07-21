@@ -26,7 +26,6 @@ class ExpandArrayLite(OperationBase):
 
         input_name_id = get_only(self.nx_inputs_dict)
         output_name_id = get_only(self.nx_outputs_dict)
-        self.linear = True
 
         self.inname = input_name_id
         self.outname = output_name_id
@@ -161,7 +160,6 @@ class ExpandScalarLite(OperationBase):
 
         self.out_shape = self.outvar.shape
         # self.val = self.invar.val
-        self.linear = True
 
     def get_evaluation(self, eval_block, vars):
 

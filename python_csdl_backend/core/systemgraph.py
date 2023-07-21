@@ -194,9 +194,10 @@ class SystemGraph(object):
 
         # initialize return dict
         operation_analytics = {}
+        operation_analytics['total'] = {}
+        operation_analytics['total']['count'] = 0
         operation_analytics['elementwise'] = {}
         operation_analytics['elementwise']['count'] = 0
-
         # Write to text file
         with open(filename, 'w') as f:
             f.write(f'node name, \t node object\n')
@@ -259,7 +260,7 @@ class SystemGraph(object):
             # keep a count of every type of node in the graph for printing
             if isinstance(node, OperationNode):
                 csdl_node = node.op
-
+                operation_analytics['total'] += 1
                 if isinstance(csdl_node, StandardOperation):
                     if csdl_node.properties['elementwise']:
                         operation_analytics['elementwise']['count'] += 1
@@ -305,9 +306,17 @@ class SystemGraph(object):
 
         # Loop through sorted graph
         total_num_vars = 0
-        total_num_scalars = 0
         total_keep_vars = 0
+        total_saved_by_csdl_vars = 0
+        total_linear_intermediate_vars = 0
+
+        total_num_scalars = 0
+        total_linear_intermediate_scalars = 0
         total_keep_scalars = 0
+        total_saved_by_csdl_scalars = 0
+
+        linear_intermediate_vars = set() # contains variables with all linear successors, and is an intermediate variable we can throw away
+        
         for node in nx.topological_sort(self.eval_graph):
 
             if not isinstance(node, OperationNode):
@@ -348,6 +357,7 @@ class SystemGraph(object):
                 promoted_id = node.promoted_id
                 keep_this_var = False
                 del_csdl_val = True
+                saved_by_csdl = False
                 if isinstance(csdl_node, Output):
                     if node.name[0] != '_':
                         if promoted_id in self.promoted_to_unique:
@@ -388,7 +398,7 @@ class SystemGraph(object):
                     keep_this_var = True
 
                 for predecessor in self.eval_graph.predecessors(node):
-                    if isinstance(predecessor.op, ImplicitOperation):
+                    if isinstance(predecessor.op, (ImplicitOperation, CustomImplicitOperation)):
                         del_csdl_val = False
                         keep_this_var = True
                 
@@ -399,6 +409,7 @@ class SystemGraph(object):
                 # NEW
                 if keep_this_var:
                     if hasattr(csdl_node, "val"):
+                        saved_by_csdl = True
                         if isinstance(csdl_node.val, np.ndarray):
                             csdl_node.val = csdl_node.val.astype('float64')
                             if isinstance(csdl_node.val, np.matrix):
@@ -414,13 +425,33 @@ class SystemGraph(object):
                     state_vals[node.id] = csdl_node.val.copy()
                 else:
                     if hasattr(csdl_node, "val"):
+                        saved_by_csdl = True
                         if isinstance(csdl_node.val, np.ndarray):
                             csdl_node.val = csdl_node.val.astype('float64')
                             if isinstance(csdl_node.val, np.matrix):
                                 csdl_node.val = np.asarray(csdl_node.val).astype('float64')
                     state_vals.reserve_state(node.id, csdl_node.shape)
-                
 
+
+                # Any variables that are not intermediate and linear, we can deallocate
+                if node not in self.permanently_allocated_vars:
+                    if self.eval_graph.out_degree(node) == 0 or self.eval_graph.in_degree(node) == 0:
+                        linear_intermediate = False
+                    else:
+                        linear_intermediate = True
+                        for successor in self.eval_graph.successors(node):
+                            if not successor.op.properties['linear']:
+                                linear_intermediate = False
+                                break
+                    
+                    if linear_intermediate:
+                        linear_intermediate_vars.add(node)
+                        total_linear_intermediate_vars += 1
+                        total_linear_intermediate_scalars += np.prod(csdl_node.shape)
+
+                if saved_by_csdl:
+                    total_saved_by_csdl_vars += 1
+                    total_saved_by_csdl_scalars += np.prod(csdl_node.shape)
                 # print(np.prod(csdl_node.shape)*4)
                 # del_csdl_val = False
                 if del_csdl_val:
@@ -455,6 +486,7 @@ class SystemGraph(object):
         
         for snap_num, current_schedule in enumerate(self.schedules):
             del_vars = set()
+            del_vars_during_deriv = set()
             if self.checkpoints_bool:
                 eval_block = CodeBlock(f'system evaluation block checkpoint {snap_num}')  # initialize evaluation block
                 # keep_vars = self.checkpoint_data[snap_num]['rank snapshot']
@@ -477,9 +509,15 @@ class SystemGraph(object):
                     node.get_block(eval_block, vars)
                     preeval_vars.update(vars)
 
-                    if self.checkpoints_bool:
-                        if node.var not in keep_vars:
-                            del_vars.add(node.var.id)
+                    for successor in self.eval_graph.successors(node.var):
+                        if self.checkpoints_bool:
+                            if node.var not in keep_vars:
+                                del_vars.add(node.var.id)
+                            if successor in linear_intermediate_vars:
+                                del_vars_during_deriv.add(successor.id)
+                        else:
+                            if successor in linear_intermediate_vars:
+                                del_vars.add(successor.id)
 
                 elif isinstance(node, OperationNode):
                     num_ops += 1
@@ -498,6 +536,11 @@ class SystemGraph(object):
                         nx_outputs[successor.id] = successor
                         if self.checkpoints_bool:
                             if successor not in keep_vars:
+                                del_vars.add(successor.id)
+                            if successor in linear_intermediate_vars:
+                                del_vars_during_deriv.add(successor.id)
+                        else:
+                            if successor in linear_intermediate_vars:
                                 del_vars.add(successor.id)
 
                     # Create the backend operation
@@ -561,9 +604,12 @@ class SystemGraph(object):
             if self.checkpoints_bool:
                 self.checkpoint_data[snap_num]['single instructions'] = eval_single_instructions
                 self.checkpoint_data[snap_num]['del vars'] = del_vars
+                self.checkpoint_data[snap_num]['del vars during deriv'] = del_vars_during_deriv
 
         if self.checkpoints_bool:
-            print(f'{total_keep_vars}/{total_num_vars} variables allocated ({total_keep_scalars}/{total_num_scalars} scalars)')
+            print(f'{total_keep_vars}/{total_num_vars} variables permanately allocated ({total_keep_scalars:,}/{total_num_scalars:,} scalars)')
+        print(f'{total_saved_by_csdl_vars}/{total_num_vars} variables allocated by CSDL ({total_saved_by_csdl_scalars:,}/{total_num_scalars:,} scalars)')
+        print(f'{total_linear_intermediate_vars}/{total_num_vars} linear intermediate vars discarded ({total_linear_intermediate_scalars:,}/{total_num_scalars:,} scalars)')
 
         # eval_multi_instrunctions = MultiInstructions('Multi_Instructions')
         # eval_multi_instrunctions.add_single_instruction(eval_single_instructions, set())
@@ -944,12 +990,16 @@ class SystemGraph(object):
                             rev_block.write(backend_op.op_summary_block)
                             # if the input shapes are not matching, reshape (hopefully not needed)
                             if backend_op.needs_input_reshape:
-                                rev_block.write(backend_op.reshape_block)
+                                if not backend_op.linear:
+                                    rev_block.write(backend_op.reshape_block)
                             # the main evaluation script is written here.
                             rev_block.write(partials_block)
                             # if the input shapes are not matching, reshape it back to original shape (hopefully not needed)
                             if backend_op.needs_input_reshape:
-                                rev_block.write(backend_op.unreshape_block)
+                                if not backend_op.linear:
+                                    rev_block.write(backend_op.unreshape_block)
+                                    # rev_block.write(f'{backend_op.linear}')
+
 
                     else:  # 1b)
 
@@ -1145,7 +1195,8 @@ class SystemGraph(object):
             if self.checkpoints_bool:
                 current_eval_instruction = self.checkpoint_data[snap_num]['single instructions']
                 current_del_vars = self.checkpoint_data[snap_num]['del vars']
-                rev_multi_instructions.add_single_instruction(current_eval_instruction, set())
+                current_del_vars_deriv = self.checkpoint_data[snap_num]['del vars during deriv']
+                rev_multi_instructions.add_single_instruction(current_eval_instruction, current_del_vars_deriv)
                 # rev_multi_instructions.add_single_instruction(rev_single_instructions, set())
                 rev_multi_instructions.add_single_instruction(rev_single_instructions, current_del_vars)
             else:

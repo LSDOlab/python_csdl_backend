@@ -25,7 +25,6 @@ class DecomposeLite(OperationBase):
         self.src_indices = self.operation.src_indices
         self.shape = self.invar.shape
         # self.val = self.invar.val
-        self.linear = True
 
     def get_evaluation(self, eval_block, vars):
 

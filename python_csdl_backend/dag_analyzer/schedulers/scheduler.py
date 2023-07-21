@@ -279,7 +279,7 @@ def check_schedule(all_schedules, estimated_timeline, sdag):
                 
                 communication_ops.add(operation)
 
-                print(operation)
+                # print(operation)
                 if 'SEND' in operation:
                     num_sends += 1
                 elif 'GET_/' in operation:

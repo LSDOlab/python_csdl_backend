@@ -78,7 +78,6 @@ class MultiInstructions():
         locals_temp = states
         for i, instruction_dict in enumerate(self.ordered_instructions):
             instruction = instruction_dict['single_instruction']
-            # print('bef', i, instruction.name, len(states))
 
             locals = instruction.execute(locals_temp)
             

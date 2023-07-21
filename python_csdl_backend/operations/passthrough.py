@@ -20,7 +20,6 @@ class PassthroughLite(OperationBase):
         self.input_name = get_only(self.nx_inputs_dict)
         self.output_name = get_only(self.nx_outputs_dict)
         self.input_size = np.prod(self.nx_inputs_dict[self.input_name].var.shape)
-        self.linear = True
 
     def get_evaluation(self, eval_block, vars):
 

@@ -180,7 +180,6 @@ class MultipleTensorSumCompAxisLite(OperationBase):
         self.out_shape = operation.outs[0].shape
         self.axes = operation.literals['axes']
         # self.vals = [var.val for var in operation.dependencies]
-        self.linear = True
 
         output_shape = np.delete(self.shape, self.axes)
         self.output_shape = tuple(output_shape)

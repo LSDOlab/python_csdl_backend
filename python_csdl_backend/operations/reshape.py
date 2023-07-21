@@ -30,7 +30,6 @@ class ReshapeLite(OperationBase):
         self.shape = self.invar.shape
         self.outshape = self.outvar.shape
         self.size = np.prod(self.shape)
-        self.linear = True
 
         # self.val = self.invar.val
 
