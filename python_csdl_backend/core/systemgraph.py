@@ -260,7 +260,7 @@ class SystemGraph(object):
             # keep a count of every type of node in the graph for printing
             if isinstance(node, OperationNode):
                 csdl_node = node.op
-                operation_analytics['total'] += 1
+                operation_analytics['total']['count'] += 1
                 if isinstance(csdl_node, StandardOperation):
                     if csdl_node.properties['elementwise']:
                         operation_analytics['elementwise']['count'] += 1
