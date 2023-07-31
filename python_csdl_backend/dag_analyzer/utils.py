@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import networkx as nx
-
+from csdl.operations.sparsematmat import sparsematmat
 def draw(G,label_attribute = None, title = 'SDAG'):
     plt.figure()
     plt.title(title)
@@ -151,7 +151,10 @@ def predict_time_temp(rep,measure_bool, manual_wait_time = 0.005):
                 # if measure_bool:
                 #     time = predict_manual_time(rep, node)
                 # else:
-                time = 1e-5
+                if isinstance(node.op, sparsematmat):
+                    time = 1e-2
+                else:
+                    time = 1e-5
             elif isinstance(node.op, CustomExplicitOperation):
                 if measure_bool:
                     time = predict_manual_time(rep, node)
