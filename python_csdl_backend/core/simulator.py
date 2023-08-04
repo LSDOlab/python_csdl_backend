@@ -1380,6 +1380,32 @@ class Simulator(SimulatorBase):
         for state_id, guess_id in self.system_graph.all_state_ids_to_guess.items():
             self.state_vals[guess_id] = self.state_vals.get_single(state_id)
 
+    def get_variable_intersection(self, sink_name = None, source_name = None):
+        if sink_name is not None:
+            node_dr_id = self._find_unique_id(sink_name)
+            node_dr = self.system_graph.unique_to_node[node_dr_id]
+            node_dr_ancestors = nx.ancestors(self.system_graph.eval_graph, node_dr)
+        else:
+            node_dr_ancestors = set(self.system_graph.eval_graph.nodes)
+
+        if source_name is not None:
+            node_cpa_id = self._find_unique_id(source_name)
+            node_cpa = self.system_graph.unique_to_node[node_cpa_id]
+            node_cpa_descendents = nx.descendants(self.system_graph.eval_graph, node_cpa)
+        else:
+            node_cpa_descendents = set(self.system_graph.eval_graph.nodes)
+        
+        
+        both_vars = node_dr_ancestors.intersection(node_cpa_descendents)   
+        
+        print('intersection of variables between', source_name, 'and', sink_name, ':')
+        for node in both_vars:
+            if node.name[0] == '_':
+                continue
+            print(node.name)
+
+        return both_vars
+
     # def find_variables_between(self, source_name, target_name):
     #     """
     #     EXPERIMENTAL: lists all variables between source and target

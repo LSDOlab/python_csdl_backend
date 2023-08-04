@@ -113,7 +113,9 @@ class SystemGraph(object):
 
                 # set unique id
                 # this is the variable name used in the generated script
-                unique_id = unique_id_num+'_'+node.name
+                # unique_id = unique_id_num+'_'+node.name
+                unique_id = (unique_id_num+'_'+node.name).replace(',','_').replace(' ','')
+
                 node.id = unique_id
                 self.unique_to_node[unique_id] = node
 
