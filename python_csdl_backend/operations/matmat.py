@@ -35,19 +35,10 @@ class MatmatLite(OperationBase):
         else:
             output_shape = (in_shapes[0][0], )
 
-        output_size = (np.prod(output_shape))
-        input1_size = np.prod(in_shapes[0])
-        input2_size = np.prod(in_shapes[1])
+        self.output_size = (np.prod(output_shape))
+        self.input1_size = np.prod(in_shapes[0])
+        self.input2_size = np.prod(in_shapes[1])
 
-        self.r0 = np.repeat(np.arange(output_size), in_shapes[0][1])
-        self.c0 = np.tile(
-            np.arange(input1_size).reshape(in_shapes[0]),
-            in_shapes[1][1]).flatten()
-
-        self.r1 = np.repeat(np.arange(output_size), in_shapes[0][1])
-        self.c1 = np.tile(
-            np.transpose(np.arange(input2_size).reshape(
-                in_shapes[1])).flatten(), in_shapes[0][0])
 
     def get_evaluation(self, eval_block, vars):
 
@@ -56,31 +47,75 @@ class MatmatLite(OperationBase):
 
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
+        output_size = self.output_size
+        input1_size = self.input1_size
+        input2_size = self.input2_size
+
+        if not lazy:
+            self.r0 = np.repeat(np.arange(output_size), self.in_shapes[0][1])
+            self.c0 = np.tile(
+                np.arange(input1_size).reshape(self.in_shapes[0]),
+                self.in_shapes[1][1]).flatten()
+
+            self.r1 = np.repeat(np.arange(output_size), self.in_shapes[0][1])
+            self.c1 = np.tile(
+                np.transpose(np.arange(input2_size).reshape(
+                    self.in_shapes[1])).flatten(), self.in_shapes[0][0])
+
+
+
         for key_tuple in partials_dict:
             input = key_tuple[1].id
             output = key_tuple[0].id
             partial_name = partials_dict[key_tuple]['name']
 
-            row_name = 'rows'+input+self.name
-            col_name = 'cols'+input+self.name
-            if self.get_lang_input(input) == self.in_names[0]:
-                vars[row_name] = self.r0
-                vars[col_name] = self.c0
-                in_size = np.prod(self.in_shapes[0])
-                other_input = self.get_input_id(self.in_names[1])
-                partials_block.write(f'vals = np.tile(np.transpose({other_input}).flatten(), {self.in_shapes[0][0]})')
-            elif self.get_lang_input(input) == self.in_names[1]:
-                vars[row_name] = self.r1
-                vars[col_name] = self.c1
-                in_size = np.prod(self.in_shapes[1])
-                other_input = self.get_input_id(self.in_names[0])
-                partials_block.write(f'vals = np.tile({other_input}, {self.in_shapes[1][1]}).flatten()')
 
-            if is_sparse_jac:
-                partials_block.write(f'{partial_name} = sp.csc_matrix((vals, ({row_name},{col_name})), shape = ({self.out_size},{in_size}))')
+            if not lazy:
+                row_name = 'rows'+input+self.name
+                col_name = 'cols'+input+self.name
+                if self.get_lang_input(input) == self.in_names[0]:
+                    vars[row_name] = self.r0
+                    vars[col_name] = self.c0
+                    in_size = np.prod(self.in_shapes[0])
+                    other_input = self.get_input_id(self.in_names[1])
+                    partials_block.write(f'vals = np.tile(np.transpose({other_input}).flatten(), {self.in_shapes[0][0]})')
+                elif self.get_lang_input(input) == self.in_names[1]:
+                    vars[row_name] = self.r1
+                    vars[col_name] = self.c1
+                    in_size = np.prod(self.in_shapes[1])
+                    other_input = self.get_input_id(self.in_names[0])
+                    partials_block.write(f'vals = np.tile({other_input}, {self.in_shapes[1][1]}).flatten()')
+
+                if is_sparse_jac:
+                    partials_block.write(f'{partial_name} = sp.csc_matrix((vals, ({row_name},{col_name})), shape = ({self.out_size},{in_size}))')
+                else:
+                    partials_block.write(f'{partial_name} = np.zeros(({self.out_size},{in_size}))')
+                    partials_block.write(f'{partial_name}[{row_name}, {col_name}] = vals')
+
             else:
-                partials_block.write(f'{partial_name} = np.zeros(({self.out_size},{in_size}))')
-                partials_block.write(f'{partial_name}[{row_name}, {col_name}] = vals')
+
+
+                if self.get_lang_input(input) == self.in_names[0]:
+                    partials_block.write(f'rows = np.repeat(np.arange({output_size}), {self.in_shapes[0][1]})')
+                    partials_block.write(f'cols = np.tile(np.arange({input1_size}).reshape({self.in_shapes[0]}), {self.in_shapes[1][1]}).flatten()')
+                    in_size = np.prod(self.in_shapes[0])
+                    other_input = self.get_input_id(self.in_names[1])
+                    partials_block.write(f'vals = np.tile(np.transpose({other_input}).flatten(), {self.in_shapes[0][0]})')
+                elif self.get_lang_input(input) == self.in_names[1]:
+                    partials_block.write(f'rows = np.repeat(np.arange({output_size}), {self.in_shapes[0][1]})')
+                    partials_block.write(f'cols = np.tile(np.transpose(np.arange({input2_size}).reshape({self.in_shapes[1]})).flatten(), {self.in_shapes[0][0]})')
+                    in_size = np.prod(self.in_shapes[1])
+                    other_input = self.get_input_id(self.in_names[0])
+                    partials_block.write(f'vals = np.tile({other_input}, {self.in_shapes[1][1]}).flatten()')
+
+                if is_sparse_jac:
+                    partials_block.write(f'{partial_name} = sp.csc_matrix((vals, (rows,cols)), shape = ({self.out_size},{in_size}))')
+                else:
+                    partials_block.write(f'{partial_name} = np.zeros(({self.out_size},{in_size}))')
+                    partials_block.write(f'{partial_name}[rows, cols] = vals')
+                partials_block.write(f'del rows')
+                partials_block.write(f'del cols')
+                partials_block.write(f'del vals')
 
     def determine_sparse(self):
         # if self.input_size < 100:

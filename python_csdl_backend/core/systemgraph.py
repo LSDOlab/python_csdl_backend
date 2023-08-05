@@ -361,7 +361,19 @@ class SystemGraph(object):
                 del_csdl_val = True
                 saved_by_csdl = False
                 if isinstance(csdl_node, Output):
-                    if node.name[0] != '_':
+                    is_auto_var = False
+
+                    if len(node.name) == 1:
+                        is_auto_var = False
+                    elif (node.name[0] == '_') and (not node.name[1].isalpha()):
+                        # We know if its a CSDL auto var if its named _ABC
+                        # where A is an integer (it seems)
+                        is_auto_var = True
+
+                    # if node.name[0] == '_':
+                    #     is_auto_var = True
+
+                    if not is_auto_var:
                         if promoted_id in self.promoted_to_unique:
                             variable_info['outputs'][promoted_id] = {}
                             variable_info['outputs'][promoted_id]['shape'] = csdl_node.shape
