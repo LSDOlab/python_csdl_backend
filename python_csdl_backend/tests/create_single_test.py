@@ -1,15 +1,15 @@
 # from csdl_om import Simulator as OmSimulator
 
 
-def run_test(model, outs, ins, name='', vals_dict=None, totals_dict=None):
+def run_test(model, outs, ins, name='', vals_dict=None, totals_dict=None, check_partials=True):
 
     for sparsity_case in ['auto', 'dense', 'sparse']:
         # Test no parallel, no checkpointing
-        run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dict)
+        run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dict, check_partials)
 
         # Test no parallel, yes checkpointing
-        run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dict, checkpoints = True)
-        
+        run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dict, check_partials, checkpoints=True)
+
         # Do not run parallel if mpi4py is not installed
         run_parallel = True
         try:
@@ -20,13 +20,13 @@ def run_test(model, outs, ins, name='', vals_dict=None, totals_dict=None):
 
         if run_parallel:
             # Test yes parallel, no checkpointing
-            run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dict, comm)
-            
+            run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dict, check_partials, comm)
+
             # Test yes parallel, yes checkpointing
-            run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dict, comm, checkpoints = True)
+            run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dict, check_partials, comm, checkpoints=True)
 
 
-def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dict, comm = None, checkpoints = False):
+def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dict, check_partials, comm=None, checkpoints=False):
     from python_csdl_backend import Simulator as LiteSimulator
     import numpy as np
 
@@ -37,26 +37,29 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
     from copy import deepcopy
     print(f'RUNNING CASE: {name=} {sparsity_case=} {comm=} {checkpoints=}')
     if comm is None:
-        sim_lite = LiteSimulator(model1,
-                                sparsity=sparsity_case,
-                                analytics=0,
-                                display_scripts=False,
-                                checkpoints=checkpoints,
-                                save_vars='all',
-            )
+        sim_lite = LiteSimulator(
+            model1,
+            sparsity=sparsity_case,
+            analytics=0,
+            display_scripts=False,
+            checkpoints=checkpoints,
+            save_vars='all',
+        )
+
     else:
         assert comm.size > 0
-        sim_lite = LiteSimulator(model2,
-                                sparsity=sparsity_case,
-                                analytics=0,
-                                # display_scripts=False,
-                                display_scripts=False,
-                                comm = comm,
-                                algorithm='Sync Points Coarse',
-                                checkpoints=checkpoints,
-                                save_vars='all',
-            )
-        
+        sim_lite = LiteSimulator(
+            model2,
+            sparsity=sparsity_case,
+            analytics=0,
+            # display_scripts=False,
+            display_scripts=False,
+            comm=comm,
+            algorithm='Sync Points Coarse',
+            checkpoints=checkpoints,
+            save_vars='all',
+        )
+
     from csdl.lang.node import Node
     Node._count = 0
     # sim_lite.eval_instructions.save()
@@ -76,7 +79,7 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
     # print('}')
     # exit()
     # --------------------------------------------
-    
+
     # UNCOMMENT FOR ASSERT STRINGS:
     # --------------------------------------------
     # import scipy.sparse as sp
@@ -94,16 +97,22 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
     # exit()
     # --------------------------------------------
 
-    # for out in outs:
-    #     print(out, sim_lite[out])
-    error_dict = sim_lite.check_partials(compact_print=True)
-    
-    # check values if given
     for key in vals_dict:
         np.testing.assert_almost_equal(
             sim_lite[key],
             vals_dict[key],
             decimal=5)
+
+    if check_partials:
+        error_dict = sim_lite.check_partials(compact_print=True)
+    else:
+        if (len(outs) > 0) and (len(ins) > 0):
+            error_dict = sim_lite.check_totals(of=outs, wrt=ins, compact_print=True)
+        else:
+            return
+
+    # check values if given
+
     #     print(key, sim_lite[key], vals_dict[key])
     # exit()
 
