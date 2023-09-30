@@ -103,7 +103,7 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
             vals_dict[key],
             decimal=5)
 
-    if check_partials:
+    if 1:
         error_dict = sim_lite.check_partials(compact_print=True)
     else:
         if (len(outs) > 0) and (len(ins) > 0):

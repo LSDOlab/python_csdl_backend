@@ -9,8 +9,8 @@ def get_model(type=0):
     import numpy as np
 
     if type == 0:
-        num_vars1 = 300
-        num_vars2 = 300
+        num_vars1 = 500
+        num_vars2 = 500
     elif type == 1:
         num_vars1 = 1
         num_vars2 = 18000
@@ -151,8 +151,8 @@ if __name__ == '__main__':
     # import sys
     # sys.setrecursionlimit(100000)
 
-    # m, outputs, inputs = get_model(0)
-    m, outputs, inputs = get_model(2)
+    m, outputs, inputs = get_model(0)
+    # m, outputs, inputs = get_model(2)
     # m, outputs, inputs = get_model(2)
     # m, outputs, inputs = get_model_index()
 

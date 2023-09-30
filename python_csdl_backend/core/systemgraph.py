@@ -117,6 +117,23 @@ class SystemGraph(object):
                 unique_id = (unique_id_num+'_'+node.name).replace(',','_').replace(' ','')
 
                 node.id = unique_id
+                node.ids = {unique_id}
+            
+                for var in node.connected_to:
+                    # if hasattr(var, 'id'):
+                    #     if unique_id != var.id:
+                    #         print('mismatch')
+                    #         raise ValueError('mismatch')
+                    var.id = unique_id
+                    node.ids.add(unique_id)
+                for var in node.declared_to:
+                    # if hasattr(var, 'id'):
+                    #     if unique_id != var.id:
+                    #         print('mismatch')
+                    #         raise ValueError('mismatch')
+                    var.id = unique_id
+                    node.ids.add(unique_id)
+
                 self.unique_to_node[unique_id] = node
 
                 # get promoted name if possible
