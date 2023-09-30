@@ -163,6 +163,8 @@ def prepare_compute_derivatives(derivative_meta):
         if derivative_meta[derivative_tuple]['backend_type'] == 'row_col_given':
             len_val = len(derivative_meta[derivative_tuple]['rows'])
             derivatives[derivative_tuple] = np.zeros((len_val, ))
+        elif derivative_meta[derivative_tuple]['backend_type'] == 'row_col_val_given':
+            pass
         else:
 
             # Otherwise, give zeros of 2D jac matrix
@@ -195,6 +197,9 @@ def postprocess_compute_derivatives(totals, derivative_meta):
             # If standard derivative, just use user-given derivatie directly.
             totals[derivative_tuple] = totals[derivative_tuple].reshape((size_out, size_in))
 
+    for total_tuple in totals:
+        if total_tuple not in derivative_meta:
+            raise KeyError(f'derivative {total_tuple} does not exist')
 
 
 def is_empty_function(func):
