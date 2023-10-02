@@ -12,65 +12,17 @@ def check_not_implemented_args(op, given_metadata_dict, type_str):
 
     # Raise error for derivative/input/output parameters not implemented for this backend
     if type_str == 'input':
-        not_implemented = {
-            'src_indices': None,
-            'flat_src_indices': None,
-            'units': None,
-            'desc': '',
-            'tags': None,
-            'shape_by_conn': False,
-            'copy_shape': None
-        }
+        not_implemented = {}
     elif type_str == 'output':
-        not_implemented = {
-            'res_units': None,
-            'lower': None,
-            'units': None,
-            'desc': '',
-            'tags': None,
-            'shape_by_conn': False,
-            'copy_shape': None,
-            'upper': None,
-            'ref': 1.0,
-            'ref0': 0.0,
-            'res_ref': 1.0,
-            'distributed': None,
-        }
+        not_implemented = {}
     elif type_str == 'derivative':
-        not_implemented = {
-            'method': 'exact',
-            'step': None,
-            'form': None,
-            'step_calc': None,
-        }
+        not_implemented = {}
     elif type_str == 'design_var':
-        not_implemented = {
-            'ref': None,
-            'ref0': None,
-            'indices': None,
-            'adder': None,
-            'parallel_deriv_color': None,
-            'cache_linear_solution': False,
-        }
+        not_implemented = {}
     elif type_str == 'constraint':
-        not_implemented = {
-            'ref': None,
-            'ref0': None,
-            'adder': None,
-            'indices': None,
-            'linear': False,
-            'parallel_deriv_color': None,
-            'cache_linear_solution': False,
-        }
+        not_implemented = {}
     elif type_str == 'objective':
-        not_implemented = {
-            'ref': None,
-            'ref0': None,
-            'index': None,
-            'adder': None,
-            'parallel_deriv_color': None,
-            'cache_linear_solution': False,
-        }
+        not_implemented = {}
     else:
         raise KeyError(f'dev error: data type {type_str} unknown')
 
@@ -93,7 +45,6 @@ def check_not_implemented_args(op, given_metadata_dict, type_str):
                     raise NotImplementedError(f'argument \'{key_dont}\' for CustomOperation has not been implemented in this backend. {type_str} \'{var}\' in {type(op)} cannot be processed.')
                 else:
                     raise NotImplementedError(f'argument \'{key_dont}\' for \'{type_str}\' argument has not been implemented in this backend.')
-
 
 def process_custom_derivatives_metadata(derivative_dict, out_dict, in_dict):
     """
