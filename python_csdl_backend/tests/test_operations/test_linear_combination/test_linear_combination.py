@@ -17,11 +17,12 @@ class LinearCombinationSample(csdl.Model):
         y = 2*w+4*x
 
         self.register_output('y', y)
+        self.register_output('y2', y-y)
 
 
 def test_linear_combination():
     nn = 1
-    vals_dict = {'y': 6*np.ones(nn) + 8*np.ones(nn)}
+    vals_dict = {'y': 6*np.ones(nn) + 8*np.ones(nn), 'y2': np.zeros(nn)}
     totals_dict = {
         ('y', 'x'): 4*np.eye(nn),
         ('y', 'w'): 2*np.eye(nn),
@@ -38,7 +39,7 @@ def test_linear_combination():
 
 def test_linear_combination_large():
     nn = (10, 10)
-    vals_dict = {'y': 6*np.ones(nn) + 8*np.ones(nn)}
+    vals_dict = {'y': 6*np.ones(nn) + 8*np.ones(nn), 'y2': np.zeros(nn)}
     totals_dict = {
         ('y', 'x'): 4*np.eye(100),
         ('y', 'w'): 2*np.eye(100),
