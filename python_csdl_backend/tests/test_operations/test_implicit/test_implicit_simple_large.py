@@ -10,9 +10,11 @@ class Implicit(csdl.Model):
         self.parameters.declare('num_nodes2')
         self.parameters.declare('num_nodes3')
         self.parameters.declare('nlsolver')
+        # self.parameters.declare('lsolver')
 
     def define(self):
         solver_type = self.parameters['nlsolver']
+        # solver_type = self.parameters['lsolver']
 
         num1 = self.parameters['num_nodes1']
         num2 = self.parameters['num_nodes2']

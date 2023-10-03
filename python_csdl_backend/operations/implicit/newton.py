@@ -110,7 +110,14 @@ class NewtonLiteSolver(ImplicitSolverBase):
 
         # DENSE/SPARSE
         # x_vec = np.linalg.solve(self.residual_jac, b_vec)
-        x_vec = sp.linalg.spsolve(self.residual_jac, b_vec)
+        # x_vec = sp.linalg.spsolve(self.residual_jac, b_vec)
+        x_vec = self.linear_solve(
+            self.residual_jac,
+            b_vec,
+            self.residual_jac_is_sparse,
+        )
+
+        
 
         x_dict = {}
         for state in b:

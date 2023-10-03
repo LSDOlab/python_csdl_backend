@@ -4,6 +4,7 @@ import scipy.sparse as sp
 from csdl import CustomImplicitOperation
 from python_csdl_backend.operations.implicit.wrappers.implicit_sim_wrapper import ImplicitSimWrapper
 from python_csdl_backend.operations.implicit.wrappers.implicit_custom_wrapper import ImplicitCustomWrapper
+from python_csdl_backend.operations.implicit.linear_solver import build_linear_solver
 
 
 class ImplicitSolverBase():
@@ -49,9 +50,12 @@ class ImplicitSolverBase():
         self.exposed = self.function_wrapper.exposed
         self.inputs = self.function_wrapper.inputs
         self.needs_partials = True
+        self.residual_jac_is_sparse = None
 
         # for state_name in self.states:
         #     self.function_wrapper.set_state(state_name, self.states[state_name]['initial_val'])
+
+        self.linear_solve = build_linear_solver(op.linear_solver, self.residuals)
 
     def solve(self, *inputs):
         """
@@ -99,17 +103,31 @@ class ImplicitSolverBase():
                 num_cols = b[state].shape[0]
 
                 # DENSE/SPARSE
+                if self.residual_jac_is_sparse:
+                    b_mat = sp.csc_matrix((num_cols, self.total_state_size))
+                else:
+                    b_mat = np.zeros((num_cols, self.total_state_size))
                 # b_mat = np.zeros((num_cols, self.total_state_size))
-                b_mat = sp.csc_matrix((num_cols, self.total_state_size))
+                # b_mat = sp.csc_matrix((num_cols, self.total_state_size))
 
                 b_built = True
             il = self.states[state]['index_lower']
             iu = self.states[state]['index_upper']
+
+            if not self.residual_jac_is_sparse:
+                if sp.issparse(b[state]):
+                    b[state] = b[state].toarray() 
+
             b_mat[:, il:iu] = b[state]
 
         # DENSE/SPARSE
         # x_mat = linalg.solve(self.residual_jac.T, b_mat.T)
-        x_mat = sp.linalg.spsolve(self.residual_jac.T, b_mat.T)
+        # x_mat = sp.linalg.spsolve(self.residual_jac.T, b_mat.T)
+        x_mat = self.linear_solve(
+            self.residual_jac.T,
+            b_mat.T,
+            self.residual_jac_is_sparse,
+        )
 
         x_mat = x_mat.reshape((b_mat.T).shape)
         x_mat = x_mat.T
@@ -245,12 +263,29 @@ class ImplicitSolverBase():
 
     def build_jac(self, totals_dict):
         '''
-        Build thhe block matrix jacobian of residuals wrt states given as totals_dict
+        Build the block matrix jacobian of residuals wrt states given as totals_dict
         '''
 
+        # Check if the total Jacobian is sparse or dense DS
+        # If one of the partials is sparse, the total Jacobian is sparse and vice versa
+        if self.residual_jac_is_sparse is None:
+            self.residual_jac_is_sparse = False
+
+            for tuple_key in totals_dict:
+                if (tuple_key[0] not in self.residuals) or (tuple_key[1] not in self.states):
+                    continue
+                
+                if sp.issparse(totals_dict[tuple_key]):
+                    self.residual_jac_is_sparse = True
+                    break
+
         # DENSE/SPARSE
+        if self.residual_jac_is_sparse:
+            self.residual_jac = sp.csc_matrix((self.total_state_size, self.total_state_size))
+        else:
+            self.residual_jac = np.zeros((self.total_state_size, self.total_state_size))
         # self.residual_jac = np.zeros((self.total_state_size, self.total_state_size))
-        self.residual_jac = sp.csc_matrix((self.total_state_size, self.total_state_size))
+        # self.residual_jac = sp.csc_matrix((self.total_state_size, self.total_state_size))
 
         for tuple_key in totals_dict:
 
@@ -277,7 +312,7 @@ class ImplicitSolverBase():
     def solve_res_system_rev_apply(self, b):
         """
         apply inverse jacobian. calls custom implicit operation's apply inverse jacobian.
-        should never be called for non-custom ImplicitOperations.
+        should not be called for non-custom ImplicitOperations.
         """
 
         accumulated_paths_rev = {}

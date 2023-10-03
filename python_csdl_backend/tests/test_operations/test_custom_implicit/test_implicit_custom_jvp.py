@@ -35,6 +35,7 @@ class CustomImp(csdl.CustomImplicitOperation):
             raise ValueError(f'solver {nlsolver} not found')
 
         self.linear_solver = csdl.ScipyKrylov()
+        # self.linear_solver = csdl.DirectSolver()
 
     def evaluate_residuals(self, inputs, outputs, residuals):
 

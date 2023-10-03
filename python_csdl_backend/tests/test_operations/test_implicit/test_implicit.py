@@ -49,8 +49,11 @@ class Implicit(csdl.Model):
             else:
                 raise ValueError(f'solver type {solver_type} is unknown.')
 
-        solve_quadratic.linear_solver = csdl.ScipyKrylov()
-
+        if solver_type == 'newton':
+            solve_quadratic.linear_solver = csdl.DirectSolver()
+        else:
+            solve_quadratic.linear_solver = csdl.ScipyKrylov()
+        
         a = self.create_input('a', val=1.5)
         b = self.create_input('b', val=2.0)
         c = self.create_input('c', val=-1.0)

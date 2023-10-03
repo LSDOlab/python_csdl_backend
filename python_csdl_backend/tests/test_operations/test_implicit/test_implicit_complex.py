@@ -31,7 +31,8 @@ class Implicit(csdl.Model):
         solve_implicit_0.declare_state('x_0', residual='r_x0', val=np.ones(shape_param)*0.2)
         solve_implicit_0.declare_state('y_0', residual='r_y0', val=0.3)
         solve_implicit_0.nonlinear_solver = csdl.NewtonSolver(solve_subsystems=False)
-        solve_implicit_0.linear_solver = csdl.ScipyKrylov()
+        # solve_implicit_0.linear_solver = csdl.ScipyKrylov()
+        solve_implicit_0.linear_solver = csdl.DirectSolver()
 
         c_0 = self.create_input('c_0', val=3.0)
         d = self.create_input('d', val=3.0)
@@ -62,7 +63,8 @@ class Implicit(csdl.Model):
         solve_implicit_1.declare_state('x_1', residual='r_x1', val=np.ones(shape_param)*0.2)
         solve_implicit_1.declare_state('y_1', residual='r_y1', val=np.ones((2, 3))*0.3)
         solve_implicit_1.nonlinear_solver = csdl.NewtonSolver(solve_subsystems=False)
-        solve_implicit_1.linear_solver = csdl.ScipyKrylov()
+        # solve_implicit_1.linear_solver = csdl.ScipyKrylov()
+        solve_implicit_1.linear_solver = csdl.DirectSolver()
 
         # inputs:
         b_1 = self.create_input('b_1', val=np.ones((2, 3))*3)

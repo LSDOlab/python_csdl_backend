@@ -1,15 +1,17 @@
 from python_csdl_backend.tests.create_single_test import run_test
 import csdl
 import numpy as np
-
+import pytest
 
 class Implicit(csdl.Model):
     def initialize(self):
         self.parameters.declare('nlsolver')
+        self.parameters.declare('lsolver')
 
     def define(self):
 
         solver_type = self.parameters['nlsolver']
+        lsolver_type = self.parameters['lsolver']
 
         quadratic = csdl.Model()
         a = quadratic.declare_variable('a')
@@ -56,8 +58,13 @@ class Implicit(csdl.Model):
             else:
                 raise ValueError(f'solver type {solver_type} is unknown.')
 
-        # solve_quadratic.linear_solver = csdl.LinearBlockGS()
-        solve_quadratic.linear_solver = csdl.ScipyKrylov()
+
+        if lsolver_type == 'direct':
+            solve_quadratic.linear_solver = csdl.DirectSolver()
+        elif lsolver_type == 'krylov':
+            solve_quadratic.linear_solver = csdl.ScipyKrylov()
+        elif lsolver_type == 'lbgs':
+            solve_quadratic.linear_solver = csdl.LinearBlockGS()
 
         a = self.create_input('a', val=1.5)
         b = self.create_input('b', val=2.0)
@@ -75,7 +82,7 @@ def test_implicit_simple_newton():
     }
     totals_dict = {}
     run_test(
-        Implicit(nlsolver='newton'),
+        Implicit(nlsolver='newton', lsolver = 'direct'),
         outs=['x', 'u', 'f'],
         ins=['a', 'b', 'c'],
         name='test_implicit_simple_newton',
@@ -92,7 +99,7 @@ def test_implicit_simple_bracket():
     }
     totals_dict = {}
     run_test(
-        Implicit(nlsolver='bracket'),
+        Implicit(nlsolver='bracket', lsolver = 'direct'),
         outs=['x', 'u', 'f'],
         ins=['a', 'b', 'c'],
         name='test_implicit_simple_bracket',
@@ -109,7 +116,7 @@ def test_implicit_simple_nlbgs():
     }
     totals_dict = {}
     run_test(
-        Implicit(nlsolver='nlbgs'),
+        Implicit(nlsolver='nlbgs', lsolver = 'direct'),
         outs=['x', 'u', 'f'],
         ins=['a', 'b', 'c'],
         name='test_implicit_simple_nlbgs',
@@ -117,6 +124,61 @@ def test_implicit_simple_nlbgs():
         totals_dict=totals_dict,
     )
 
+def test_implicit_simple_newton_krylov():
+    vals_dict = {
+        'x': np.array([0.38742589]),
+        'u': np.array([0.21525044]),
+        'f': np.array([2.55802897]),
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(nlsolver='newton', lsolver = 'krylov'),
+        outs=['x', 'u', 'f'],
+        ins=['a', 'b', 'c'],
+        name='test_implicit_simple_newton',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+    )
+
+
+def test_implicit_simple_bracket_krylov():
+    vals_dict = {
+        'x': np.array([0.38742589]),
+        'u': np.array([0.21525044]),
+        'f': np.array([2.55802897]),
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(nlsolver='bracket', lsolver = 'krylov'),
+        outs=['x', 'u', 'f'],
+        ins=['a', 'b', 'c'],
+        name='test_implicit_simple_bracket',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+    )
+
+
+def test_implicit_simple_nlbgs_krylov():
+    vals_dict = {
+        'x': np.array([0.38742589]),
+        'u': np.array([0.21525044]),
+        'f': np.array([2.55802897]),
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(nlsolver='nlbgs', lsolver = 'krylov'),
+        outs=['x', 'u', 'f'],
+        ins=['a', 'b', 'c'],
+        name='test_implicit_simple_nlbgs',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+    )
+
+def test_implicit_simple_lbgs_error():
+    import python_csdl_backend
+    r = csdl.GraphRepresentation(Implicit(nlsolver='nlbgs', lsolver = 'lbgs'))
+    with pytest.raises(NotImplementedError) as excinfo:  
+        python_csdl_backend.Simulator(r)  
 
 if __name__ == '__main__':
 
@@ -143,11 +205,16 @@ if __name__ == '__main__':
     # quadratic.register_output('y', y)
     # quadratic.register_output('v', v)
 
-    # import python_csdl_backend
+    import python_csdl_backend
 
-    # sim = python_csdl_backend.Simulator(quadratic)
-    # sim.run()
-    # exit()
+    m = Implicit(nlsolver='nlbgs')
+    sim = python_csdl_backend.Simulator(m, sparsity='sparse', display_scripts=1)
+    sim.run()
+    # sim.compute_totals(of = 'f', wrt = 'a')
+    sim.compute_totals(of = ['f'], wrt = 'a')
+    exit()
+
+
 
     run_test(
         Implicit(nlsolver='nlbgs'),

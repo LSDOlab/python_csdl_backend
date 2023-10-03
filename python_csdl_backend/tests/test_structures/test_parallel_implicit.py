@@ -46,7 +46,8 @@ def get_model(solver = 'newton'):
                 else:
                     raise ValueError(f'solver type {solver_type} is unknown.')
 
-            solve_quadratic.linear_solver = csdl.ScipyKrylov()
+            # solve_quadratic.linear_solver = csdl.ScipyKrylov()
+            solve_quadratic.linear_solver = csdl.DirectSolver()
 
             a = self.declare_variable(in_name1, val=np.ones(in_shape1))
             x = solve_quadratic(a)
