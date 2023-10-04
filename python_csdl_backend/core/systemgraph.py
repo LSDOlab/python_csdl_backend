@@ -206,10 +206,28 @@ class SystemGraph(object):
         # if 'reverse mode', need reverse graph
         self.rev_graph = self.eval_graph.reverse(copy=False)
 
-    def get_analytics(self, filename):
+    def get_analytics(self, name):
         '''
         get and print information about the graph
         '''
+
+        import os
+        name_prepend = ''
+        if name != '':
+            name_prepend = f'_{name}'
+        directory_name = f'MODEL_SUMMARY{name_prepend}'
+        graph_file_name = f'{directory_name}/GRAPH.txt'
+        vars_file_name = f'{directory_name}/VARS.txt'
+
+        if not os.path.exists(directory_name):
+            os.makedirs(directory_name)
+
+        # if name == '':
+        #     filename_full = 'SUMMARY_GRAPH.txt'
+        #     filename_all_vars = 'SUMMARY_GRAPH_VARS.txt'
+        # else:
+        #     filename_full = f'SUMMARY_GRAPH_{name}.txt'
+        #     filename_all_vars = f'SUMMARY_GRAPH_VARS_{name}.txt'
 
         # initialize return dict
         operation_analytics = {}
@@ -218,14 +236,15 @@ class SystemGraph(object):
         operation_analytics['elementwise'] = {}
         operation_analytics['elementwise']['count'] = 0
         # Write to text file
-        with open(filename, 'w') as f:
+        with open(graph_file_name, 'w') as f:
             f.write(f'node name, \t node object\n')
-
+        with open(vars_file_name, 'w') as f:
+            f.write(f'\n')
         # collect information from operations
         for node in self.eval_graph:
 
             # write to filename a summary of each node
-            with open(filename, 'a') as f:
+            with open(graph_file_name, 'a') as f:
 
                 # if isinstance(node, OperationNode):
                 #     continue
@@ -275,6 +294,64 @@ class SystemGraph(object):
                         f.write(f'\t\t{dep.name}\n')
                     else:
                         f.write(f'\t\t{dep.name},{dep.var.shape} \n')
+
+
+            # Write to text file
+            with open(vars_file_name, 'a') as f:
+                if isinstance(node, VariableNode):
+
+                    is_auto_var = False
+
+                    if len(node.name) == 1:
+                        is_auto_var = False
+                    elif (node.name[0] == '_') and (not node.name[1].isalpha()):
+                        # We know if its a CSDL auto var if its named _ABC
+                        # where A is an integer (it seems)
+                        is_auto_var = True
+                    if is_auto_var:
+                        continue
+                    
+                    if hasattr(node.var, 'val'):
+                        avg_val = np.mean(node.var.val)
+                    else:
+                        avg_val = None
+
+                    f.write(f'\n\n{node.id}')
+                    f.write(f'\n\tname:                    {node.name}')
+                    f.write(f'\n\tunpromoted name:         {node.unpromoted_namespace}.{node.name}')
+                    f.write(f'\n\tpromoted name:           {node.namespace}.{node.name}')
+                    f.write(f'\n\tshape:                   {node.var.shape}')
+                    f.write(f'\n\tavg val:                 {avg_val}')
+                    f.write(f'\n\tgraph info:              {self.eval_graph.in_degree(node)} in op / {self.eval_graph.out_degree(node)} out op(s)')
+                    f.write(f'\n\tconnected to:')
+                    for connected_to_node in node.connected_to:
+                        f.write(f'\n\t                         {connected_to_node.unpromoted_namespace}.{connected_to_node.name}')
+                    f.write(f'\n\tpromoted to:')
+                    for connected_to_node in node.declared_to:
+                        f.write(f'\n\t                         {connected_to_node.unpromoted_namespace}.{connected_to_node.name}')
+                    # f.write(f'\n{node.name}, {node.var}, {node.unpromoted_namespace}.{node.name}\n')
+                    # if node.connected_to:
+                    #     connected_to_bool = True
+                    # else:
+                    #     connected_to_bool = False
+                    # if node.declared_to:
+                    #     declared_to_bool = True
+                    # else:
+                    #     declared_to_bool = False
+
+                    # if node.promoted_id in self.rep.promoted_to_node:
+                    #     if not isinstance(node.var, (Output, Input)):
+                    #         if np.array_equal(node.var.val, np.ones(node.var.shape)):
+                    #             f.write(f'\tWARNING: this declared variable is not a promotion or connection target with a value being set.\n')
+                    #         else:
+                    #             f.write(f'\tWARNING: this declared variable is not a promotion or connection. \n')
+                    # f.write(f'\tCONNECTED TO: {connected_to_bool}\n')
+                    # for connected_to_node in node.connected_to:
+                    #     f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}.{connected_to_node.name}\n')
+                    # f.write(f'\tPROMOTED TO: {declared_to_bool}\n')
+                    # for connected_to_node in node.declared_to:
+                    #     f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}.{connected_to_node.name}\n')
+
 
             # keep a count of every type of node in the graph for printing
             if isinstance(node, OperationNode):

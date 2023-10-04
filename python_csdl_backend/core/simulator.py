@@ -137,10 +137,10 @@ class Simulator(SimulatorBase):
         # :::::ANALYTICS:::::
         if self.analytics:
             print('PROCESSING GRAPH...')
-            if self.name == '':
-                filename = 'SUMMARY_GRAPH.txt'
-            else:
-                filename = f'SUMMARY_GRAPH_{self.name}.txt'
+            # if self.name == '':
+            #     filename = 'SUMMARY_GRAPH.txt'
+            # else:
+            #     filename = f'SUMMARY_GRAPH_{self.name}.txt'
         # :::::ANALYTICS:::::
 
         # model and graph creation
@@ -323,7 +323,7 @@ class Simulator(SimulatorBase):
         # :::::ANALYTICS:::::
         if self.analytics:
             # loop through operations and stuff
-            operation_analytics = self.system_graph.get_analytics(filename)
+            operation_analytics = self.system_graph.get_analytics(name)
 
             # print some stuff
             isdag = nx.is_directed_acyclic_graph(self.system_graph.eval_graph)
