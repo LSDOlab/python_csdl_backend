@@ -63,10 +63,12 @@ class OperationBase():
         self.check_input_reshaping()
 
         # Keep a commented block that describes the operation for easy debugging
-        inputs_string = list_to_argument_str(list(nx_inputs.keys()))
-        outputs_string = list_to_argument_str(list(nx_outputs.keys()))
-        inputs_string_lang = list_to_argument_str([self.get_lang_input(x) for x in nx_inputs.keys()])
-        outputs_string_lang = list_to_argument_str([self.get_lang_output(x) for x in nx_outputs.keys()])
+        # n_in = list(nx_inputs)
+        # n_out = list(nx_outputs)
+        # inputs_string = list_to_argument_str(n_in)
+        # outputs_string = list_to_argument_str(n_out)
+        inputs_string_lang = list_to_argument_str([self.get_lang_input(x) for x in nx_inputs])
+        outputs_string_lang = list_to_argument_str([self.get_lang_output(x) for x in nx_outputs])
         inputs_shapes = list_to_argument_str([str(lang_input_var.shape) for lang_input_var in self.input_csdl_to_rep])
         outputs_shapes = list_to_argument_str([str(successor.var.shape) for successor in self.nx_outputs_dict.values()])
         for an_output in nx_outputs.values():
@@ -314,7 +316,10 @@ class OperationBase():
         if the REP input and LANG input do not match shapes, we have to reshape.
         """
 
-        for lang_input_var, rep_input_var in self.input_csdl_to_rep.items():
+        # for lang_input_var, rep_input_var in self.input_csdl_to_rep.items():
+        # for lang_input_var, rep_input_var in self.input_csdl_to_rep.items():
+        for lang_input_var in self.input_csdl_to_rep:
+            rep_input_var = self.input_csdl_to_rep[lang_input_var]
 
             lang_shape = lang_input_var.shape
             rep_shape = rep_input_var.var.shape
