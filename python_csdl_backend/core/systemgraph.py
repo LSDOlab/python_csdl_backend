@@ -318,17 +318,17 @@ class SystemGraph(object):
 
                     f.write(f'\n\n{node.id}')
                     f.write(f'\n\tname:                    {node.name}')
-                    f.write(f'\n\tunpromoted name:         {node.unpromoted_namespace}.{node.name}')
-                    f.write(f'\n\tpromoted name:           {node.namespace}.{node.name}')
+                    f.write(f'\n\tunpromoted name:         {prepend_namespace(node.unpromoted_namespace,node.name)}')
+                    f.write(f'\n\tpromoted name:           {prepend_namespace(node.namespace,node.name)}')
                     f.write(f'\n\tshape:                   {node.var.shape}')
                     f.write(f'\n\tavg val:                 {avg_val}')
                     f.write(f'\n\tgraph info:              {self.eval_graph.in_degree(node)} in op / {self.eval_graph.out_degree(node)} out op(s)')
                     f.write(f'\n\tconnected to:')
                     for connected_to_node in node.connected_to:
-                        f.write(f'\n\t                         {connected_to_node.unpromoted_namespace}.{connected_to_node.name}')
+                        f.write(f'\n\t                         {prepend_namespace(connected_to_node.unpromoted_namespace,connected_to_node.name)}')
                     f.write(f'\n\tpromoted to:')
                     for connected_to_node in node.declared_to:
-                        f.write(f'\n\t                         {connected_to_node.unpromoted_namespace}.{connected_to_node.name}')
+                        f.write(f'\n\t                         {prepend_namespace(connected_to_node.unpromoted_namespace,connected_to_node.name)}')
                     # f.write(f'\n{node.name}, {node.var}, {node.unpromoted_namespace}.{node.name}\n')
                     # if node.connected_to:
                     #     connected_to_bool = True

@@ -102,7 +102,7 @@ class Simulator(SimulatorBase):
 
         # check model is Model or GraphRepresentation
         if isinstance(representation, Model):
-            self.rep = GraphRepresentation(representation)
+            self.rep = GraphRepresentation(representation, analytics=analytics)
         elif isinstance(representation, GraphRepresentation):
             self.rep = representation
         else:
