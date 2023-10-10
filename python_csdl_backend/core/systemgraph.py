@@ -4,7 +4,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, get_path_name, increment_id, lineup_string
+from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, get_path_name, increment_id, lineup_string, get_reverse_seed
 from python_csdl_backend.core.operation_map import (
     get_backend_op,
     get_backend_implicit_op,
@@ -105,6 +105,8 @@ class SystemGraph(object):
         self.promoted_to_unpromoted = self.rep.promoted_to_unpromoted
         self.unpromoted_to_promoted = self.rep.unpromoted_to_promoted
 
+        # combinable = 0
+        # nn = 0
         for node in self.eval_graph.nodes:
 
             if isinstance(node, VariableNode):
@@ -119,6 +121,27 @@ class SystemGraph(object):
                 node.id = unique_id
                 node.ids = {unique_id}
             
+                # UNCOMMENT for potential linear preaccumulation tests 
+                # nn += 1                
+                # all_linear_after = False
+                # s_sizes = []
+                # for pred in self.eval_graph.predecessors(node):
+                #     if pred.op.properties['linear']:
+                #         all_linear_after = True
+                #         for successors in self.eval_graph.successors(node):
+                #             s_sizes.append(str(successors.op.properties['elementwise'])[0])
+                #             for ss in self.eval_graph.successors(successors):
+                #                 s_sizes.append(np.prod(ss.var.shape))
+                #             if isinstance(successors, OperationNode):
+                #                 if not successors.op.properties['linear']:
+                #                     all_linear_after = False
+                #                     break
+                
+                # if all_linear_after:
+                #     combinable+=1
+                #     print(f'LINEAR PREACCUMULATION: {combinable}/{nn} ', np.prod(node.var.shape), s_sizes, unique_id)
+                # print(all_linear_after)
+
                 for var in node.connected_to:
                     # if hasattr(var, 'id'):
                     #     if unique_id != var.id:
@@ -838,15 +861,17 @@ class SystemGraph(object):
             else:
                 instruction_name = f'{self.comm.rank} REV:'
 
-            for output_name in output_ids:
-                instruction_name += f'{output_name},'
+            # instruction_name = 'REV_'
+            for output_name in sorted(output_ids):
+                output_lang_name = output_info_dict[output_name]['lang_name']
+                instruction_name += f'{output_lang_name},'
             instruction_name += '-->'
             for input_name in input_ids:
                 instruction_name += f'{input_name},'
             rev_block = CodeBlock(instruction_name)
 
             # Set up code gen
-            instruction_name = 'REV'
+            # instruction_name = 'REV_'
             if self.comm is not None:
                 instruction_name += f'_rank{self.comm.rank}'
             if self.checkpoints_bool:
@@ -973,9 +998,10 @@ class SystemGraph(object):
                             if path_out_name not in initialized_paths:
                                 if mpi_var_id == out_id:
                                     if output_size > 100:
-                                        rev_block.write(f'{path_out_name} = sp.eye({output_size}, format = \'csr\')')
+                                        # rev_block.write(f'{path_out_name} = {get_reverse_seed(out_id)}, format = \'csr\')')
+                                        rev_block.write(f'{path_out_name} = {get_reverse_seed(out_id)}')
                                     else:
-                                        rev_block.write(f'{path_out_name} = np.eye({output_size})')
+                                        rev_block.write(f'{path_out_name} = {get_reverse_seed(out_id)}')
                                 else:
                                     if output_size*mpi_var_size > 5000:
                                         rev_block.write(f'{path_out_name} = sp.csr_array(({output_size}, {mpi_var_size}))')
@@ -1148,10 +1174,13 @@ class SystemGraph(object):
                                     if self.unique_to_node[jac_function_output_id] != output_node:
                                         raise ValueError(f'path output {jac_function_output_id} of jac_function operation {middle_operation.name} should have been computed but is not.')
                                 if jac_function_output_id == out_id:
-                                    rev_block.write(f'{path_out_name} = np.eye({output_size})')
+                                    rev_block.write(f'{path_out_name} = {get_reverse_seed(out_id)}@np.eye({output_size})')
+                                    # rev_block.write(f'{path_out_name} = sp.eye({output_size}, format = \'csr\')')
                                 else:
                                     implicit_out_size = np.prod(self.unique_to_node[jac_function_output_id].var.shape)
-                                    rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {implicit_out_size}))')
+                                    rev_block.write(f'{path_out_name} = np.zeros(({get_reverse_seed(out_id)}.shape[0], {implicit_out_size}))')
+                                    # rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {implicit_out_size}))')
+                                    # rev_block.write(f'{path_out_name} = sp.csc_matrix(({output_size}, {implicit_out_size}))')
 
                             path_out_names.append(path_out_name)
                             variable_names_to_delete.add(path_out_name)
@@ -1209,7 +1238,9 @@ class SystemGraph(object):
                                 # If this is the first iteration in BFS, we need to set seed for output
                                 if predecessor == output_node:
                                     # The line below had issues with pointers.
-                                    initialized_path_string = get_init_path_string(partials_name, backend_op, self.sparsity_type)
+                                    # initialized_path_string = get_init_path_string(partials_name, backend_op, self.sparsity_type)
+                                    initialized_path_string = get_successor_path_string(get_reverse_seed(out_id), partials_name, backend_op)
+
                                     rev_block.write(f'{path_successor} = {initialized_path_string}')
                                     initialized_paths.add(path_successor)
                                     continue
@@ -1286,15 +1317,21 @@ class SystemGraph(object):
                         elif input_id == out_id:  # case 2:
                             rev_block.comment(f'{totals_name} = identity')
                             if use_sparse:
-                                prerev_vars[totals_name] = sp.eye(output_size, format = 'csr')
+                                # prerev_vars[totals_name] = sp.eye(output_size, format = 'csr')
+                                rev_block.write(f'{totals_name} = {get_reverse_seed(out_id)}')
                             else:
-                                prerev_vars[totals_name] = np.eye(output_size)
+                                # prerev_vars[totals_name] = np.eye(output_size)
+                                rev_block.write(f'{totals_name} = {get_reverse_seed(out_id)}')
                         else:  # case 3:
                             rev_block.comment(f'{totals_name} = zero')
                             if use_sparse:
-                                prerev_vars[totals_name] = sp.csr_array((output_size, input_size))
+                                # prerev_vars[totals_name] = sp.csr_array((output_size, input_size))
+                                # rev_block.write(f'{totals_name} = {get_reverse_seed(out_id)}*0.0')
+                                rev_block.write(f'{totals_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {input_size}))')
                             else:
-                                prerev_vars[totals_name] = np.zeros((output_size, input_size))
+                                # prerev_vars[totals_name] = np.zeros((output_size, input_size))
+                                # rev_block.write(f'{totals_name} = {get_reverse_seed(out_id)}*0.0')
+                                rev_block.write(f'{totals_name} = np.zeros(({get_reverse_seed(out_id)}.shape[0],{input_size}))')
 
             # Compile single instruction
             rev_single_instructions.script.write(rev_block)
@@ -1818,15 +1855,21 @@ def get_init_path_string(partials_name, backend_op, sparsity_type):
     """
     # print(backend_op.elementwise, backend_op)
     if not backend_op.elementwise:
-        return f'{partials_name}.copy()'
+        # return f'{partials_name}.copy()'
+        return f'sp.csc_matrix({partials_name})'
     else:
         is_sparse = get_operation_sparsity(backend_op, sparsity_type)
 
         if is_sparse:
-            return f'sp.diags({partials_name}, format = \'csc\')'
+            # return f'sp.diags({partials_name}, format = \'csc\')'
+            return f'sp.csc_matrix(np.diagflat({partials_name}))'
+
         else:
             return f'np.diagflat({partials_name})'
 
+# def initialize_seed_path(output_seed, partials_name):
+    
+    
 
 def get_operation_sparsity(backend_op, sparsity_type):
     """

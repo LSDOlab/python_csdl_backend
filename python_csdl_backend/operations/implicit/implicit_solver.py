@@ -217,6 +217,7 @@ class ImplicitSolverBase():
                         # TODO: if we know totals(exposed, input) is zero, we can skip this part
                         jac += output_paths[exposed_ind] @ self.totals[(exposed, input)]
 
+                # jac = sp.csc_matrix(jac)
                 accumulated_paths.append(jac)
 
         else:
@@ -299,6 +300,8 @@ class ImplicitSolverBase():
             iu_o = self.states[state_of]['index_upper']
             il_w = self.states[state_wrt]['index_lower']
             iu_w = self.states[state_wrt]['index_upper']
+
+            # print(tuple_key, totals_dict[tuple_key].shape, self.residual_jac[il_o:iu_o, il_w:iu_w].shape)
 
             self.residual_jac[il_o:iu_o, il_w:iu_w] = totals_dict[tuple_key]
 

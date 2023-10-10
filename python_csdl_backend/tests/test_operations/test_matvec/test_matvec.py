@@ -113,7 +113,7 @@ def test_matvec_sparse():
     run_test(
         MatvecSampleSparse(val_1=in_val1, A=A),
         outs=['y'],
-        ins=['x', 'w'],
+        ins=['x'],
         name='test_matvec2',
         vals_dict=vals_dict,
         totals_dict=totals_dict)

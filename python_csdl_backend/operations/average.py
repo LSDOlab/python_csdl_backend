@@ -97,7 +97,7 @@ class SingleTensorAverageLite(OperationBase):
             if is_sparse_jac:
                 vars[partial_name] = sp.csc_matrix(self.val)
             else:
-                vars[partial_name] = self.val.reshape((self.input_size))
+                vars[partial_name] = self.val.reshape((1,self.input_size))
         else:
             if is_sparse_jac:
                 vars[partial_name] = sp.csc_matrix((self.val.flatten(), (self.rows, self.cols)), shape=(self.output_size, self.input_size))

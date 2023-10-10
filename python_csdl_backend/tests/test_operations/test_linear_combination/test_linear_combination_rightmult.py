@@ -280,3 +280,6 @@ def test_linear_combination_large_rand():
         name='test_linear_combination',
         vals_dict=vals_dict,
         totals_dict=totals_dict)
+    
+if __name__ == '__main__':
+    test_linear_combination_large_rand()

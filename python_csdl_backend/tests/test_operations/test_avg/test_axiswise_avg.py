@@ -34,7 +34,7 @@ def test_average():
     run_test(
         AverageSample(scalability_param=n),
         outs=['y'],
-        ins=['x'],
+        ins=['v1'],
         name='test_axisaverage',
         vals_dict=vals_dict,
         totals_dict=totals_dict)
@@ -71,7 +71,12 @@ def test_axisaverage():
     run_test(
         AxisaverageSample(scalability_param=n),
         outs=['y'],
-        ins=['x'],
+        ins=['v1'],
         name='test_axisaverage',
         vals_dict=vals_dict,
         totals_dict=totals_dict)
+
+
+if __name__ == '__main__':
+    test_average()
+    # test_axisaverage()

@@ -18,7 +18,10 @@ class ImplicitSimWrapper(ImplicitWrapperBase):
         if implicit_checkpoints:
             self.sim = Simulator(op.rep, checkpoints = 1, save_vars=set().union(set(out_res_map.keys()), set(out_in_map.keys()), set(res_out_map.keys()), set(expose)))
         else:
-            self.sim = Simulator(op.rep)
+            name = ''
+            for state in out_res_map:
+                name += state + '__'
+            self.sim = Simulator(op.rep, analytics=0,display_scripts=0, name = name)
 
         # dictionary of information on state
         # Try to keep as many things out of memory after init

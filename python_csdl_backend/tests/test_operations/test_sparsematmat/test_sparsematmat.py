@@ -39,7 +39,7 @@ def test_sparsematmat():
     run_test(
         SparsematmatSample(scalability_param=nn),
         outs=['y'],
-        ins=['x', 'w'],
+        ins=['x'],
         name='test_sparsematmat',
         vals_dict=vals_dict,
         totals_dict=totals_dict)
@@ -80,7 +80,7 @@ def test_sparsematmat2():
     run_test(
         SparsematmatSample2(scalability_param=nn),
         outs=['y'],
-        ins=['x', 'w'],
+        ins=['x'],
         name='test_sparsematmat',
         vals_dict=vals_dict,
         totals_dict=totals_dict)

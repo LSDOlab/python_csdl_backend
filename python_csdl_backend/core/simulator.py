@@ -5,9 +5,11 @@ from python_csdl_backend.operations.parallel.point_to_point import get_comm_node
 from python_csdl_backend.core.instructions import SingleInstruction
 from python_csdl_backend.core.operation_map import csdl_to_back_map
 from python_csdl_backend.core.systemgraph import SystemGraph
-from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, lineup_string, set_opt_upper_lower, set_scaler_array, analyze_dict_memory
+from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, lineup_string, set_opt_upper_lower, set_scaler_array, analyze_dict_memory, get_reverse_seed, get_path_name, get_csdl_type_string
 from python_csdl_backend.utils.custom_utils import check_not_implemented_args
 import warnings
+from numbers import Number
+
 # import time
 
 import matplotlib.pyplot as plt
@@ -102,7 +104,7 @@ class Simulator(SimulatorBase):
 
         # check model is Model or GraphRepresentation
         if isinstance(representation, Model):
-            self.rep = GraphRepresentation(representation, analytics=analytics)
+            self.rep = GraphRepresentation(representation, analytics=analytics, rep_name  = name)
         elif isinstance(representation, GraphRepresentation):
             self.rep = representation
         else:
@@ -470,7 +472,7 @@ class Simulator(SimulatorBase):
 
         if len(adj_name) > 250:
             adj_name = adj_name[:250]
-
+        # exit()
         # initialize adjoint derivatives instructions to write to
         # This script will be ran every
         adj_instructions = SingleInstruction(adj_name)
@@ -644,10 +646,20 @@ class Simulator(SimulatorBase):
         return hash_key, ofs, wrts
     
     # @profile
-    def _compute_totals(self, hash_key, ofs, wrts, return_format):
+    def _compute_totals(
+            self,
+            hash_key,
+            ofs,
+            wrts,
+            return_format,
+            vjps:dict = None
+        ):
         """
         executes the derivative evaluation codeobject of hash_key. should be only
-        be used by compute_totals
+        be used by compute_totals and compute_vector_jacobian.
+
+        if ofs is a list, then we compute total Jacobians.
+        otherwise if its a dictionary, compute vector-Jacobian product.
         """
         # Execute script
         vars = self.derivative_instructions_map[hash_key]['precomputed_vars']
@@ -658,6 +670,39 @@ class Simulator(SimulatorBase):
         # print('\npreeval_vars before',len(vars))
         # for key in vars:
         #     print(key)
+
+        if vjps is not None:
+            for of in vjps:
+                output_id = self._find_unique_id(of)
+                vars[get_reverse_seed(output_id)] = vjps[of]
+        else:
+            for of in ofs:
+                output_id = self._find_unique_id(of)
+                output_node = self._get_unique_node(output_id)
+                output_size = np.prod(output_node.var.shape)
+
+                if output_size > 100:
+                    vars[get_reverse_seed(output_id)] = np.eye(output_size)
+                else:
+                    vars[get_reverse_seed(output_id)] = sp.eye(output_size, format = 'csr')
+
+            # elif input_id == out_id:  # case 2:
+            #     rev_block.comment(f'{totals_name} = identity')
+            #     if use_sparse:
+            #         # prerev_vars[totals_name] = sp.eye(output_size, format = 'csr')
+            #         rev_block.comment(f'{totals_name} = {get_reverse_seed(out_id)}')
+            #     else:
+            #         # prerev_vars[totals_name] = np.eye(output_size)
+            #         rev_block.comment(f'{totals_name} = {get_reverse_seed(out_id)}')
+            # else:  # case 3:
+            #     rev_block.comment(f'{totals_name} = zero')
+            #     if use_sparse:
+            #         prerev_vars[totals_name] = sp.csr_array((output_size, input_size))
+            #         rev_block.comment(f'{totals_name} = {get_reverse_seed(out_id)}*0.0')
+            #     else:
+            #         prerev_vars[totals_name] = np.zeros((output_size, input_size))
+            #         rev_block.comment(f'{totals_name} = {get_reverse_seed(out_id)}*0.0')
+
 
         if self.checkpoints_bool:
             # OLD
@@ -694,7 +739,6 @@ class Simulator(SimulatorBase):
                             return_dict[of_name] = {}
                         return_dict[of_name][wrt_name] = current_derivative
         return return_dict
-    
     # @profile
     def compute_totals(
         self,
@@ -718,6 +762,67 @@ class Simulator(SimulatorBase):
         hash_key, ofs, wrts = self.get_totals_key(of, wrt)
 
         return self._compute_totals(hash_key, ofs, wrts, return_format)
+
+    def compute_vector_jacobian_product(
+        self,
+        of_vectors,
+        wrt,
+        return_format='[(of, wrt)]',
+    ):
+        '''
+        compute vector Jacobian products (vjps).
+
+        Parameters:
+        -----------
+            of_vectors: dict[str: np.ndarray, sp.sparse, Number]
+                dictionary of outputs and their corresponding vector(s).
+                The vector(s) must have shape (n,) or (n,m) where n is the size of the output and m is the number of vectors.
+            wrt: list or str
+                name(s) of inputs to take derivatives wrt.
+            return_format: str
+                (EXPERIMENTAL) what format to return derivative in.
+        '''
+
+        if not isinstance(of_vectors, dict):
+            raise ValueError(f'of_vectors must be a dictionary, got {type(of_vectors)}.')
+
+        of = list(of_vectors.keys())
+        hash_key, ofs, wrts = self.get_totals_key(of, wrt)
+
+        # Check to make sure that the vectors are the correct shape
+        for output_name in of_vectors:
+            output_id = self._find_unique_id(output_name)
+            output_node = self._get_unique_node(output_id)
+            output_size = np.prod(output_node.var.shape)
+            given_vector = of_vectors[output_name]
+
+            # Checks:
+            # given shape/size is consistent
+            # take transpose for vjp
+            # convert to np.ndarray and 2d shape
+            if isinstance(given_vector, Number):
+                if output_size != 1:
+                    raise ValueError(f'Vector for output {output_name} is not the correct size. Expected ({output_size},m) or ({output_size},), got (1,).')
+                of_vectors[output_name] = np.array([given_vector])
+            elif isinstance(given_vector, np.ndarray) or sp.issparse(given_vector):
+                if given_vector.shape[0] != output_size:
+                    raise ValueError(f'Vector for output {output_name} is not the correct size. Expected ({output_size},m) or ({output_size},), got {given_vector.shape}.')
+                if len(given_vector.shape) == 1:
+                    of_vectors[output_name] = given_vector.reshape(output_size,1)
+            else:
+                raise ValueError(f'Vector for output {output_name} is not the correct type. Expected np.ndarray, sp.sparse or number, got {type(given_vector)}.')
+
+            # Transpose for vjp
+            of_vectors[output_name] = of_vectors[output_name].T
+
+        # compute vjp
+        return self._compute_totals(
+            hash_key,
+            ofs,
+            wrts,
+            return_format,
+            vjps = of_vectors
+        )
 
     def visualize_implementation(self, depth=False):
         # TODO: TEMPORARY VISUALIZATION:

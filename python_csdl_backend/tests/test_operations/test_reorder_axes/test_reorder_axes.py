@@ -28,7 +28,7 @@ def test_reorderaxes():
     run_test(
         ReorderAxesSample(),
         outs=['y'],
-        ins=['x'],
+        ins=['M1'],
         name='test_reorderaxes',
         vals_dict=vals_dict,
         totals_dict=totals_dict)

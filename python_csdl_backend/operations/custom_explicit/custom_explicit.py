@@ -233,6 +233,8 @@ class CustomExplicitWrapper():
                         d_outputs[output_name] = d_outs[output_name][row_index, :].reshape(out_shape)
 
                 else:
+                    if isinstance(d_outs[output_name], sp.coo_matrix):
+                        d_outs[output_name] = d_outs[output_name].tocsc()
                     d_outputs[output_name] = (d_outs[output_name][row_index, :].toarray()).reshape(out_shape)
 
             # initial d_inputs: users ARE writing to d_inputs

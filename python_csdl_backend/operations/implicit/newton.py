@@ -62,6 +62,8 @@ class NewtonLiteSolver(ImplicitSolverBase):
             if self.full_residual_jac:
                 totals = self.function_wrapper.compute_totals()
 
+                # for i in totals:
+                #     print(i, totals[i].shape)
                 # profiler.disable()
                 # profiler.dump_stats('output')
                 self.build_jac(totals)

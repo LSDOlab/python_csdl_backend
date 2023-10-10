@@ -21,8 +21,8 @@ def test_tree():
 
     run_test(
         TreeLargeSample(),
-        outs=['y'],
-        ins=['x'],
+        outs=[],
+        ins=[],
         name='test_arcsin',
         vals_dict=vals_dict,
         totals_dict=totals_dict
@@ -45,8 +45,8 @@ def test_tree_promote():
 
     run_test(
         TreeLargePromote(),
-        outs=['y'],
-        ins=['x'],
+        outs=[],
+        ins=[],
         name='test_arcsin',
         vals_dict=vals_dict,
         totals_dict=totals_dict
@@ -90,8 +90,8 @@ def test_tree_connections():
 
     run_test(
         TreeLargeConnections(),
-        outs=['y'],
-        ins=['x'],
+        outs=['level_0.level_4_0.level_3_0.level_2_0.level_1_0.x_0_d', 'level_0.level_4_1.x_0_d'],
+        ins=['level_0.level_4_0.x_0', 'level_0.x_0'],
         name='test_arcsin',
         vals_dict=vals_dict,
         totals_dict=totals_dict
@@ -109,8 +109,8 @@ if __name__ == '__main__':
     s = time.time()
     # g = csdl.GraphRepresentation(TreeLargeSample())
     g = csdl.GraphRepresentation(TreeLargeConnections())
-    g = csdl.GraphRepresentation(TreeLargePromote())
-    exit()
+    # g = csdl.GraphRepresentation(TreeLargePromote())
+    # exit()
     print('TIME', time.time() - s)
 
     profiler.disable()

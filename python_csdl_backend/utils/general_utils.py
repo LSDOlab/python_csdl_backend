@@ -37,6 +37,11 @@ def get_deriv_name(of, wrt, partials=True):
     else:
         return f'd{of}_d{wrt}'
 
+def get_reverse_seed(out_id):
+    '''
+    get the seed name for reverse mode
+    '''
+    return f'r_seed_{out_id}'
 
 def get_path_name(var, out_id = None):
     '''

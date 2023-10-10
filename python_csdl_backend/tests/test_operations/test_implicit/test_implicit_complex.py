@@ -147,11 +147,11 @@ if __name__ == '__main__':
 
 
     from python_csdl_backend import Simulator as LiteSimulator
-    sim_lite = LiteSimulator(Implicit(num=10),comm = comm, algorithm='Sync Points Coarse', display_scripts=0)
+    sim_lite = LiteSimulator(Implicit(num=10), algorithm='Sync Points Coarse', display_scripts=0)
     sim_lite.run()
-    # sim_lite.check_partials(compact_print=1)
-    # sim_lite.check_totals(of=outs, wrt=ins, compact_print=1)
     sim_lite.check_partials(compact_print=1)
+    # sim_lite.check_totals(of=outs, wrt=ins, compact_print=1)
+    # sim_lite.check_partials(compact_print=1)
     # sim_lite.check_totals(of=outs, wrt=ins, compact_print=0)
     # print(sim_lite.compute_totals(of=outs, wrt=ins))
 

@@ -41,7 +41,7 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
             model1,
             sparsity=sparsity_case,
             analytics=0,
-            display_scripts=False,
+            display_scripts=0,
             checkpoints=checkpoints,
             save_vars='all',
         )
@@ -53,7 +53,7 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
             sparsity=sparsity_case,
             analytics=0,
             # display_scripts=False,
-            display_scripts=False,
+            display_scripts=0,
             comm=comm,
             algorithm='Sync Points Coarse',
             checkpoints=checkpoints,
@@ -104,7 +104,45 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
             decimal=5)
 
     if 1:
+        # Check derivatives
         error_dict = sim_lite.check_partials(compact_print=True)
+
+        # Check vector jacobian products
+        test_vjp = False
+        if (len(vals_dict) > 0):
+            test_vjp = True
+            outs_check_vjp = list(vals_dict.keys()) 
+        elif (len(outs) > 0):
+            test_vjp = True
+            outs_check_vjp = outs 
+
+        if test_vjp:
+            # Set first cartesian basis vector to compute vjp
+            of_vectors = {}
+            for i, key in enumerate(outs_check_vjp):
+                of_vectors[key] = np.zeros(sim_lite[key].shape).flatten()
+                if i == 0:
+                    check_key = key
+                    of_vectors[key][0] = 1.0
+
+            in_vars = [in_name for in_name in sim_lite.variable_info['leaf_start'].keys()]
+            vjp_dict = sim_lite.compute_vector_jacobian_product(of_vectors=of_vectors, wrt=in_vars)
+
+            # Lets make sure that the first row of the derivatives is equal
+            check_dict = sim_lite.compute_totals(of=outs_check_vjp, wrt=in_vars)
+            for key_deriv in check_dict:
+                if key_deriv[0] != check_key:
+                    continue
+
+                if isinstance(check_dict[key_deriv], np.ndarray):
+                    check_vector = check_dict[key_deriv][0,:]
+                else:
+                    check_vector = check_dict[key_deriv].toarray()[0,:]
+                
+                np.testing.assert_almost_equal(
+                    check_vector.flatten(),
+                    vjp_dict[key_deriv].flatten(),
+                    decimal=5)
     else:
         if (len(outs) > 0) and (len(ins) > 0):
             error_dict = sim_lite.check_totals(of=outs, wrt=ins, compact_print=True)
