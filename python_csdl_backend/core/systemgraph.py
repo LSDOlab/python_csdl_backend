@@ -42,7 +42,8 @@ class SystemGraph(object):
                  dvs=None,
                  objective=None,
                  constraints=None,
-                 opt_bool=False):
+                 opt_bool=False,
+                 name = ''):
 
         # representation object processed
         self.rep = rep
@@ -56,6 +57,7 @@ class SystemGraph(object):
         self.all_state_ids_to_guess = {}  # maps state ids to the names of the initial guess
         self.permanently_allocated_vars = set() # Set of VariableNodes that should always be kept in memory. (snapshots, contraints, objectives, visualization, etc.)
         self.save_all_outputs = False # ONly applies to checkpointing. If save_all_outputs, all registered outputs will be allocated permanetely.
+        self.name = name
         self.process_rep()
 
         # rev or fwd
@@ -67,7 +69,7 @@ class SystemGraph(object):
         # if name == 'dense' ,  use dense jacobians
         self.sparsity_type = sparsity_type
 
-        self.name = 'default'
+        # self.name = 'default'
 
         if mode == 'rev':
             self.reverse_graph()
@@ -111,7 +113,16 @@ class SystemGraph(object):
 
             if isinstance(node, VariableNode):
                 # increment id
-                unique_id_num = increment_id(unique_id_num)
+                # unique_id_num = increment_id(unique_id_num)
+
+                id_to_use = node.var.unique_id_num
+                for other_node in node.connected_to:
+                    if id_to_use < other_node.var.unique_id_num:
+                        id_to_use = other_node.var.unique_id_num
+                for other_node in node.declared_to:
+                    if id_to_use < other_node.var.unique_id_num:
+                        id_to_use = other_node.var.unique_id_num
+                unique_id_num = 'v'+str(id_to_use)
 
                 # set unique id
                 # this is the variable name used in the generated script
@@ -142,6 +153,7 @@ class SystemGraph(object):
                 #     print(f'LINEAR PREACCUMULATION: {combinable}/{nn} ', np.prod(node.var.shape), s_sizes, unique_id)
                 # print(all_linear_after)
 
+                other_ids = []
                 for var in node.connected_to:
                     # if hasattr(var, 'id'):
                     #     if unique_id != var.id:
@@ -149,6 +161,7 @@ class SystemGraph(object):
                     #         raise ValueError('mismatch')
                     var.id = unique_id
                     node.ids.add(unique_id)
+                    other_ids.append(var.var.unique_id_num)
                 for var in node.declared_to:
                     # if hasattr(var, 'id'):
                     #     if unique_id != var.id:
@@ -156,7 +169,17 @@ class SystemGraph(object):
                     #         raise ValueError('mismatch')
                     var.id = unique_id
                     node.ids.add(unique_id)
+                    other_ids.append(var.var.unique_id_num)
 
+                
+                # UNCOMMENT TO DEBUG PARALLELIZATION 
+                # from mpi4py import MPI
+                # comm = MPI.COMM_WORLD
+                # rank = comm.rank
+                # print(self.name, rank, unique_id_num, node.name, other_ids)
+
+                if unique_id in self.unique_to_node:
+                    raise ValueError(f'Unique id {unique_id} already exists in graph.')
                 self.unique_to_node[unique_id] = node
 
                 # get promoted name if possible
@@ -624,7 +647,7 @@ class SystemGraph(object):
             else:
                 eval_block = CodeBlock('system evaluation block')  # initialize evaluation block
 
-            instr_name = 'RUN_MODEL'
+            instr_name = f'RUN_MODEL_{self.name}'
             if self.comm is not None:
                 instr_name += f'_rank{self.comm.rank}'
             if self.checkpoints_bool:
@@ -1003,10 +1026,14 @@ class SystemGraph(object):
                                     else:
                                         rev_block.write(f'{path_out_name} = {get_reverse_seed(out_id)}')
                                 else:
-                                    if output_size*mpi_var_size > 5000:
-                                        rev_block.write(f'{path_out_name} = sp.csr_array(({output_size}, {mpi_var_size}))')
-                                    else:
-                                        rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {mpi_var_size}))')
+                                    # if output_size*mpi_var_size > 5000:
+                                    #     # rev_block.write(f'{path_out_name} = sp.csr_array(({output_size}, {mpi_var_size}))')
+                                    #     rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
+
+                                    # else:
+                                    #     # rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {mpi_var_size}))')
+                                    #     rev_block.write(f'{path_out_name} = np.zeros(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
+                                    rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
 
                                 initialized_paths.add(path_out_name)
 
@@ -1029,10 +1056,11 @@ class SystemGraph(object):
                                 #     else:
                                 #         rev_block.write(f'{path_out_name} = np.eye({output_size})')
                                 # else:
-                                if output_size*mpi_var_size > 5000:
-                                    rev_block.write(f'{path_out_name} = sp.csr_array(({output_size}, {mpi_var_size}))')
-                                else:
-                                    rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {mpi_var_size}))')
+                                # if output_size*mpi_var_size > 5000:
+                                #     rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
+                                # else:
+                                #     rev_block.write(f'{path_out_name} = np.zeros(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
+                                rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
 
                                 initialized_paths.add(path_out_name)
                             # Write MPI adjoint

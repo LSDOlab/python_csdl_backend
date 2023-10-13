@@ -167,7 +167,8 @@ class Simulator(SimulatorBase):
             dvs=self.dvs,
             objective=self.obj,
             constraints=self.cvs,
-            opt_bool=self.opt_bool)
+            opt_bool=self.opt_bool,
+            name = name)
         self.system_graph.comm = comm
         self.system_graph.checkpoints_bool = checkpoints
         self.system_graph.lazy = self.lazy
@@ -285,7 +286,19 @@ class Simulator(SimulatorBase):
         # # print(f'RANK {self.comm.rank}', len(raw_variable_owner_map), len(self.system_graph.variable_owner_map), num_vars, num_vars2, len(str2nodes))
         # print(f'RANK {self.comm.rank}', vars_list)
         # # print(f'RANK {self.comm.rank}', schedule)
-        
+        # print(raw_variable_owner_map)
+
+
+        # UNCOMMENT TO OUTPUT st2nodes/raw_variable_owner_map
+        # if analytics:
+        #     with open(f'rank_{self.comm.rank}_str2nodes.txt', 'w') as f:
+        #         f.write('str2nodes:')
+        #         for node in str2nodes:
+        #             f.write(f'\n\t{node}')
+        #         f.write('\nraw_variable_owner_map:')
+        #         for node in raw_variable_owner_map:
+        #             f.write(f'\n\t{node}')
+
         for node in raw_variable_owner_map:
             # print(f'RANK {self.comm.rank}', len(raw_variable_owner_map), len(self.system_graph.variable_owner_map), num_vars, num_vars2, len(str2nodes), node)
             if node in str2nodes:
@@ -297,7 +310,7 @@ class Simulator(SimulatorBase):
                 # time.sleep(1)
                 # self.comm.Abort()
                 print('To debug, make sure that there aren\'t any CSDL variables defined AFTER the scheduling procedure. Recursive simulators and operations must be instantiated before parallelization')
-                raise ValueError(f'node not in str2nodes. Likely that processor 0\'s CSDL model does not match the other processors\' ({self.comm.rank}).')
+                raise ValueError(f'node {node} not in str2nodes. Likely that processor 0\'s CSDL model does not match the other processors\' ({self.comm.rank}).')
 
         if comm is not None:
             comm.barrier()
