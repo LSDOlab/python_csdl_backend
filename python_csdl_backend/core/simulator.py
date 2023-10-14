@@ -694,10 +694,11 @@ class Simulator(SimulatorBase):
                 output_node = self._get_unique_node(output_id)
                 output_size = np.prod(output_node.var.shape)
 
-                if output_size > 100:
+                if output_size < 100:
                     vars[get_reverse_seed(output_id)] = np.eye(output_size)
                 else:
                     vars[get_reverse_seed(output_id)] = sp.eye(output_size, format = 'csr')
+                # vars[get_reverse_seed(output_id)] = sp.eye(output_size, format = 'csr')
 
             # elif input_id == out_id:  # case 2:
             #     rev_block.comment(f'{totals_name} = identity')

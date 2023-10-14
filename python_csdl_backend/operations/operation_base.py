@@ -94,55 +94,67 @@ class OperationBase():
         raise error if matching variable is not found.
         """
 
-        # Map predecessors from user-defined CSDL variable objects to representation variable objects
-        for csdl_pred in self.operation.dependencies:
-            # Find correct predecessor
-            pred = list(csdl_pred.rep_node)[0]
+        # # Map predecessors from user-defined CSDL variable objects to representation variable objects
+        # for csdl_pred in self.operation.dependencies:
+        #     # Find correct predecessor
+        #     pred = list(csdl_pred.rep_node)[0]
 
-            # If there is a mismatch somehow, find the correct one
-            # (Unfortunately this makes it O(n**2))
-            found = False
-            if pred.id not in self.nx_inputs_dict:
-                for rep_node in csdl_pred.rep_nodes:
+        #     # If there is a mismatch somehow, find the correct one
+        #     # (Unfortunately this makes it O(n**2))
+        #     found = False
 
-                    if not hasattr(rep_node, 'id'):
-                        continue
-                    if rep_node.id in self.nx_inputs_dict:
-                        pred = rep_node
-                        found = True
-                        break
-            else:
-                found = True
+        #     print(pred.var.name)
+        #     for i in csdl_pred.rep_nodes:
+        #         if not hasattr(i, 'id'):
+        #             print('\t', i.var)
+        #         else:
+        #             print('\t', i.var, i.id)
 
-            # Raise error:
-            if not found:
+        #     print([(idd, self.nx_inputs_dict[idd].var) for idd in self.nx_inputs_dict.keys()])
+        #     # print(pred.var, [node.var for node in csdl_pred.rep_nodes])
+            
+        #     # print(pred.var, [node.var for node in csdl_pred.rep_nodes])
+        #     if pred.id not in self.nx_inputs_dict:
+        #         for rep_node in csdl_pred.rep_nodes:
 
-                # for i in pred.connected_to:
-                #     print(i.id, i, i.var.name)
-                # for i in pred.declared_to:
-                #     print(i.id, i, i.var.name)
+        #             if not hasattr(rep_node, 'id'):
+        #                 continue
+        #             if rep_node.id in self.nx_inputs_dict:
+        #                 pred = rep_node
+        #                 found = True
+        #                 break
+        #     else:
+        #         found = True
 
-                print('\n\n::::::ERROR::::::')
-                print('CSDL variable: ', csdl_pred.name)
-                for rn in csdl_pred.rep_nodes:
-                    if hasattr(rn, 'id'):
-                        rnid = rn.id
-                    else:
-                        rnid = 'no id'
-                    s = f'\t{rnid}, {rn}, {rn.var}, {rn.var.name}'
-                    print(s)
-                print('Found IR node:', pred)
+        #     # Raise error:
+        #     if not found:
 
-                raise KeyError(f'input {pred.name} ({pred.id}) not found in nx_inputs_dict \n {self.nx_inputs_dict}, \n')
+        #         # for i in pred.connected_to:
+        #         #     print(i.id, i, i.var.name)
+        #         # for i in pred.declared_to:
+        #         #     print(i.id, i, i.var.name)
 
-            # Set correct mapping
-            self.input_csdl_to_rep[csdl_pred] = pred
-            self.input_rep_to_csdl[pred] = csdl_pred
+        #         print('\n\n::::::ERROR::::::')
+        #         print('CSDL variable: ', csdl_pred.name)
+        #         for rn in csdl_pred.rep_nodes:
+        #             if hasattr(rn, 'id'):
+        #                 rnid = rn.id
+        #             else:
+        #                 rnid = 'no id'
+        #             s = f'\t{rnid}, {rn}, {rn.var}, {rn.var.name}'
+        #             print(s)
+        #         print('Found IR node:', pred)
 
-            # if not hasattr(pred, 'id'):
-            #     print(csdl_pred.name, [f'\n{rn}, {rn.var}, {rn.var.name}' for rn in csdl_pred.rep_nodes])
-            self.input_name_to_unique[csdl_pred.name] = pred.id
-        return
+        #         raise KeyError(f'input {pred.name} ({pred.id}) not found in nx_inputs_dict \n {self.nx_inputs_dict}, \n')
+
+        #     # Set correct mapping
+        #     self.input_csdl_to_rep[csdl_pred] = pred
+        #     self.input_rep_to_csdl[pred] = csdl_pred
+
+        #     # if not hasattr(pred, 'id'):
+        #     #     print(csdl_pred.name, [f'\n{rn}, {rn.var}, {rn.var.name}' for rn in csdl_pred.rep_nodes])
+        #     self.input_name_to_unique[csdl_pred.name] = pred.id
+        # return
         
         # OLD implementation that was less efficient
         for pred in self.nx_inputs_dict.values():

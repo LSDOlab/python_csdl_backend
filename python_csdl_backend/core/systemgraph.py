@@ -1026,14 +1026,14 @@ class SystemGraph(object):
                                     else:
                                         rev_block.write(f'{path_out_name} = {get_reverse_seed(out_id)}')
                                 else:
-                                    # if output_size*mpi_var_size > 5000:
-                                    #     # rev_block.write(f'{path_out_name} = sp.csr_array(({output_size}, {mpi_var_size}))')
-                                    #     rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
+                                    if output_size*mpi_var_size > 5000:
+                                        # rev_block.write(f'{path_out_name} = sp.csr_array(({output_size}, {mpi_var_size}))')
+                                        rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
 
-                                    # else:
-                                    #     # rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {mpi_var_size}))')
-                                    #     rev_block.write(f'{path_out_name} = np.zeros(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
-                                    rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
+                                    else:
+                                        # rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {mpi_var_size}))')
+                                        rev_block.write(f'{path_out_name} = np.zeros(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
+                                    # rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
 
                                 initialized_paths.add(path_out_name)
 
@@ -1056,11 +1056,11 @@ class SystemGraph(object):
                                 #     else:
                                 #         rev_block.write(f'{path_out_name} = np.eye({output_size})')
                                 # else:
-                                # if output_size*mpi_var_size > 5000:
-                                #     rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
-                                # else:
-                                #     rev_block.write(f'{path_out_name} = np.zeros(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
-                                rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
+                                if output_size*mpi_var_size > 5000:
+                                    rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
+                                else:
+                                    rev_block.write(f'{path_out_name} = np.zeros(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
+                                # rev_block.write(f'{path_out_name} = sp.csr_array(({get_reverse_seed(out_id)}.shape[0], {mpi_var_size}))')
 
                                 initialized_paths.add(path_out_name)
                             # Write MPI adjoint
