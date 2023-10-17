@@ -7,11 +7,13 @@ class Implicit(csdl.Model):
     def initialize(self):
         self.parameters.declare('nlsolver')
         self.parameters.declare('lsolver')
+        self.parameters.declare('use_vjp', default=True)
 
     def define(self):
 
         solver_type = self.parameters['nlsolver']
         lsolver_type = self.parameters['lsolver']
+        use_vjp = self.parameters['use_vjp']
 
         quadratic = csdl.Model()
         a = quadratic.declare_variable('a')
@@ -44,7 +46,7 @@ class Implicit(csdl.Model):
         # SOLUTION: x [0.38742589]
         # SOLUTION: u [0.66666667]
 
-        solve_quadratic = self.create_implicit_operation(quadratic)
+        solve_quadratic = self.create_implicit_operation(quadratic, use_vjps=use_vjp)
         if solver_type == 'bracket':
             solve_quadratic.declare_state('x', residual='y', val=0.34, bracket=(0, 0.5))
             solve_quadratic.declare_state('u', residual='v', val=0.4, bracket=(0, 1.0))
@@ -72,6 +74,7 @@ class Implicit(csdl.Model):
         x, u = solve_quadratic(a, b, c)
 
         self.register_output('f', x*3.0 + u*3.0 + 0.5*a)
+        self.register_output('nl_f', x*u**2)
 
 
 def test_implicit_simple_newton():
@@ -174,6 +177,56 @@ def test_implicit_simple_nlbgs_krylov():
         totals_dict=totals_dict,
     )
 
+def test_implicit_simple_bracket_vjp():
+    vals_dict = {
+        'x': np.array([0.38742589]),
+        'u': np.array([0.21525044]),
+        'f': np.array([2.55802897]),
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(nlsolver='bracket', lsolver = 'direct', use_vjp=False),
+        outs=['x', 'u', 'f'],
+        ins=['a', 'b', 'c'],
+        name='test_implicit_simple_bracket',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+    )
+
+
+def test_implicit_simple_nlbgs_vjp():
+    vals_dict = {
+        'x': np.array([0.38742589]),
+        'u': np.array([0.21525044]),
+        'f': np.array([2.55802897]),
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(nlsolver='nlbgs', lsolver = 'direct', use_vjp=False),
+        outs=['x', 'u', 'f'],
+        ins=['a', 'b', 'c'],
+        name='test_implicit_simple_nlbgs',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+    )
+
+def test_implicit_simple_newton_krylov_vjp():
+    vals_dict = {
+        'x': np.array([0.38742589]),
+        'u': np.array([0.21525044]),
+        'f': np.array([2.55802897]),
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(nlsolver='newton', lsolver = 'krylov', use_vjp=False),
+        outs=['x', 'u', 'f'],
+        ins=['a', 'b', 'c'],
+        name='test_implicit_simple_newton',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+    )
+
+
 def test_implicit_simple_lbgs_error():
     import python_csdl_backend
     r = csdl.GraphRepresentation(Implicit(nlsolver='nlbgs', lsolver = 'lbgs'))
@@ -181,7 +234,48 @@ def test_implicit_simple_lbgs_error():
         python_csdl_backend.Simulator(r)  
 
 if __name__ == '__main__':
+    # test_implicit_simple_nlbgs_krylov()
+    m = Implicit(nlsolver='nlbgs', lsolver = 'krylov')
 
+
+    import python_csdl_backend
+    sim_lite = python_csdl_backend.Simulator(m, sparsity='sparse', display_scripts=0)
+
+    sim_lite.run()
+
+    outs_check_vjp = ['x','f']
+    # Set first cartesian basis vector to compute vjp
+    of_vectors = {}
+    for i, key in enumerate(outs_check_vjp):
+        of_vectors[key] = np.zeros(sim_lite[key].shape).flatten()
+        if i == 0:
+            check_key = key
+            of_vectors[key][0] = 1.0
+
+    in_vars = [in_name for in_name in sim_lite.variable_info['leaf_start'].keys()]
+    vjp_dict = sim_lite.compute_vector_jacobian_product(of_vectors=of_vectors, wrt=in_vars)
+
+    # Lets make sure that the first row of the derivatives is equal
+    check_dict = sim_lite.compute_totals(of=outs_check_vjp, wrt=in_vars)
+    for key_deriv in check_dict:
+        of_var = key_deriv[0]
+        wrt_var = key_deriv[1]
+        if of_var != check_key:
+            continue
+
+        if isinstance(check_dict[key_deriv], np.ndarray):
+            check_vector = check_dict[key_deriv][0,:]
+        else:
+            check_vector = check_dict[key_deriv].toarray()[0,:]
+        
+        # print()
+        print(check_vector.flatten(),vjp_dict[wrt_var].flatten())
+        np.testing.assert_almost_equal(
+            check_vector.flatten(),
+            vjp_dict[wrt_var].flatten(),
+            decimal=5)
+
+    exit()
     # quadratic = csdl.Model()
     # a = quadratic.declare_variable('a')
     # b = quadratic.declare_variable('b')

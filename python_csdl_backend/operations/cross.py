@@ -247,7 +247,9 @@ class CrossLite(OperationBase):
             func_name = self.operation.name+'_'+input+'_jac'
             vars[func_name] = compute_cross_jac
 
+            # partials_block.write(f'import time as time\ns = time.time()')
             partials_block.write(f'{partial_name} = {func_name}({self.get_input_id(self.in1_name)}, {self.get_input_id(self.in2_name)})')
+            # partials_block.write(f'print(time.time()-s, \'{partial_name}\', {self.outsize}, {self.insize})')
 
     def determine_sparse(self):
         # in1_sparsity = len(self.rows1)/(self.outsize*self.insize)

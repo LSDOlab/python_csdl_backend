@@ -37,12 +37,15 @@ class ImplicitSolverBase():
                 self.full_input_jac = False
             else:
                 self.full_input_jac = True
+            self.full_expose_jac = True # Should not matter
 
         else:
             self.function_wrapper = ImplicitSimWrapper(op, ins, outs)
             self.full_residual_jac = True
-            self.full_input_jac = True
 
+            self.full_input_jac = self.function_wrapper.full_input_jac
+            self.full_expose_jac = self.function_wrapper.full_expose_jac
+            
         # attributes needed by solvers
         self.states = self.function_wrapper.states
         self.total_state_size = self.function_wrapper.total_state_size
@@ -163,16 +166,8 @@ class ImplicitSolverBase():
             if self.needs_partials:
                 self.totals = self.function_wrapper.compute_totals()
                 self.build_jac(self.totals)
-        # outputs_paths will be in order of ordered_outputs
-        for i, exposed in enumerate(self.ordered_outs):
-            # If the output is exposed, chain rule the output to the input:
-            # py/px = py/pe1 * pe1/px + py/pe12* pe2/px + ... + c_yx
-            # c_yx is computed in the loop before this
-            if exposed in self.exposed:
 
-                for state in self.states:
-                    # TODO: if we know totals(exposed, state) is zero, we can skip this part
-                    b[state] += output_paths[i] @ self.totals[(exposed, state)]
+        b = self.accumulate_exposed(output_paths, b)
 
         # print(self.ordered_outs)
         # print(b)
@@ -348,3 +343,41 @@ class ImplicitSolverBase():
         for i, state_name in enumerate(self.states):
             # print(state_name, guesses[i].reshape(self.states[state_name]['shape']))
             self.function_wrapper.set_state(state_name, guesses[i].reshape(self.states[state_name]['shape']))
+
+    def accumulate_exposed(self, output_paths, b):
+        # outputs_paths will be in order of ordered_outputs
+
+        if self.full_expose_jac:
+            # Perform matrix multiplication for exposed variables
+            for i, exposed in enumerate(self.ordered_outs):
+                # If the output is exposed, chain rule the output to the input:
+                # py/px = py/pe1 * pe1/px + py/pe12* pe2/px + ... + c_yx
+                # c_yx is computed in the loop before this
+                if exposed in self.exposed:
+                    
+                    for state in self.states:
+                        # TODO: if we know totals(exposed, state) is zero, we can skip this part
+                        b[state] += output_paths[i] @ self.totals[(exposed, state)]
+            return b
+        else:
+            # Prepare vjps
+            of_vectors = {}
+            for i, exposed in enumerate(self.ordered_outs):
+                if exposed in self.exposed:
+                    of_vectors[exposed] = output_paths[i].T
+                    # print(exposed, output_paths[i].shape)
+            state_in = {}
+            for state_name in self.states:
+                state_in[state_name] = np.zeros(self.states[state_name]['shape'])
+            
+            # compute vjp
+            vjped_exposed,_ = self.function_wrapper.compute_rev_jvp_exposed(
+                of_vectors,
+                state_in,
+            )
+
+            # accumulate vps
+            for state in self.states:
+                b[state] += vjped_exposed[state].flatten()
+
+            return b

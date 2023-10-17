@@ -16,8 +16,8 @@ def build_linear_solver(csdl_linear_solver, residuals):
     Creates a function that solves the linear system Ax = b, where A is a matrix, b is a vector, and sparse is a boolean that indicates whether A is sparse or not.
     """
 
-    if isinstance(csdl_linear_solver, DirectSolver) or (csdl_linear_solver is None):
-    # if 1:
+    # if isinstance(csdl_linear_solver, DirectSolver) or (csdl_linear_solver is None):
+    if 1:
         def lin_solve_function(A, b, sparse):
             """
             Direct Solver

@@ -15,7 +15,21 @@ def diag_mult(path_to, diag_vals):
     else:
         # print(f'{comm.rank}sparse trigger')
         return path_to.multiply(diag_vals)
-    
+
+# Performs multiplication of elementwise operations.
+def std_mult(path_to, partial):
+    return path_to@partial
+
+
+    import time
+    s = time.time()
+    out = path_to@partial
+    end = time.time()
+    taken = end-s
+    if taken > 1e-4:
+        print(f'TIME: {taken} \t {path_to.shape} \t {partial.shape} \t {type(path_to)} \t {type(partial)}')
+    return out
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 

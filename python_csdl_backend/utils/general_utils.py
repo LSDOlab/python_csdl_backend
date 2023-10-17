@@ -53,6 +53,12 @@ def get_path_name(var, out_id = None):
     else:
         return f'path_from_{out_id}_to_{var}'
 
+def get_path_name_vjp(var, out_id = None):
+    '''
+    get the path name for code generation
+    '''
+    return get_path_name(var)
+
 def get_csdl_type_string(csdl_node):
 
     if isinstance(csdl_node, Output):

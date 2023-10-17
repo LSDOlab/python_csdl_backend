@@ -122,11 +122,13 @@ def test_implicit_complex_one_out():
         name='test_implicit_complex_one_out',
         vals_dict=vals_dict,
         totals_dict=totals_dict,
+        
     )
 
 
 if __name__ == '__main__':
-    # test_implicit_complex()
+    test_implicit_complex()
+    exit()
     # run_test(
     #     Implicit(num=10),
     #     outs=['exposed_f1'],

@@ -4,14 +4,14 @@ import numpy as np
 import scipy.sparse as sp
 
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, get_path_name, increment_id, lineup_string, get_reverse_seed
+from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, get_path_name, increment_id, lineup_string, get_reverse_seed, get_path_name_vjp
 from python_csdl_backend.core.operation_map import (
     get_backend_op,
     get_backend_implicit_op,
     get_backend_custom_explicit_op,
     get_backend_custom_implicit_op,
 )
-from python_csdl_backend.core.accumulation_operations import diag_mult
+from python_csdl_backend.core.accumulation_operations import diag_mult, std_mult
 from python_csdl_backend.core.state_manager import StateManager 
 from python_csdl_backend.operations.parallel.point_to_point import PointToPointCall, SendCall, RecvCall
 from python_csdl_backend.core.instructions import SingleInstruction, MultiInstructions
@@ -281,6 +281,10 @@ class SystemGraph(object):
         operation_analytics['total']['count'] = 0
         operation_analytics['elementwise'] = {}
         operation_analytics['elementwise']['count'] = 0
+        total_var_size = 0
+        maximum_var_size_shape = (0,(0,),'')
+        num_vars = 0
+
         # Write to text file
         with open(graph_file_name, 'w') as f:
             f.write(f'node name, \t node object\n')
@@ -354,49 +358,47 @@ class SystemGraph(object):
                         # We know if its a CSDL auto var if its named _ABC
                         # where A is an integer (it seems)
                         is_auto_var = True
-                    if is_auto_var:
-                        continue
-                    
-                    if hasattr(node.var, 'val'):
-                        avg_val = np.mean(node.var.val)
-                    else:
-                        avg_val = None
+                    if not is_auto_var:
+                        if hasattr(node.var, 'val'):
+                            avg_val = np.mean(node.var.val)
+                        else:
+                            avg_val = None
 
-                    f.write(f'\n\n{node.id}')
-                    f.write(f'\n\tname:                    {node.name}')
-                    f.write(f'\n\tunpromoted name:         {prepend_namespace(node.unpromoted_namespace,node.name)}')
-                    f.write(f'\n\tpromoted name:           {prepend_namespace(node.namespace,node.name)}')
-                    f.write(f'\n\tshape:                   {node.var.shape}')
-                    f.write(f'\n\tavg val:                 {avg_val}')
-                    f.write(f'\n\tgraph info:              {self.eval_graph.in_degree(node)} in op / {self.eval_graph.out_degree(node)} out op(s)')
-                    f.write(f'\n\tconnected to:')
-                    for connected_to_node in node.connected_to:
-                        f.write(f'\n\t                         {prepend_namespace(connected_to_node.unpromoted_namespace,connected_to_node.name)}')
-                    f.write(f'\n\tpromoted to:')
-                    for connected_to_node in node.declared_to:
-                        f.write(f'\n\t                         {prepend_namespace(connected_to_node.unpromoted_namespace,connected_to_node.name)}')
-                    # f.write(f'\n{node.name}, {node.var}, {node.unpromoted_namespace}.{node.name}\n')
-                    # if node.connected_to:
-                    #     connected_to_bool = True
-                    # else:
-                    #     connected_to_bool = False
-                    # if node.declared_to:
-                    #     declared_to_bool = True
-                    # else:
-                    #     declared_to_bool = False
+                        f.write(f'\n\n{node.id}')
+                        f.write(f'\n\tname:                    {node.name}')
+                        f.write(f'\n\tunpromoted name:         {prepend_namespace(node.unpromoted_namespace,node.name)}')
+                        f.write(f'\n\tpromoted name:           {prepend_namespace(node.namespace,node.name)}')
+                        f.write(f'\n\tshape:                   {node.var.shape}')
+                        f.write(f'\n\tavg val:                 {avg_val}')
+                        f.write(f'\n\tgraph info:              {self.eval_graph.in_degree(node)} in op / {self.eval_graph.out_degree(node)} out op(s)')
+                        f.write(f'\n\tconnected to:')
+                        for connected_to_node in node.connected_to:
+                            f.write(f'\n\t                         {prepend_namespace(connected_to_node.unpromoted_namespace,connected_to_node.name)}')
+                        f.write(f'\n\tpromoted to:')
+                        for connected_to_node in node.declared_to:
+                            f.write(f'\n\t                         {prepend_namespace(connected_to_node.unpromoted_namespace,connected_to_node.name)}')
+                        # f.write(f'\n{node.name}, {node.var}, {node.unpromoted_namespace}.{node.name}\n')
+                        # if node.connected_to:
+                        #     connected_to_bool = True
+                        # else:
+                        #     connected_to_bool = False
+                        # if node.declared_to:
+                        #     declared_to_bool = True
+                        # else:
+                        #     declared_to_bool = False
 
-                    # if node.promoted_id in self.rep.promoted_to_node:
-                    #     if not isinstance(node.var, (Output, Input)):
-                    #         if np.array_equal(node.var.val, np.ones(node.var.shape)):
-                    #             f.write(f'\tWARNING: this declared variable is not a promotion or connection target with a value being set.\n')
-                    #         else:
-                    #             f.write(f'\tWARNING: this declared variable is not a promotion or connection. \n')
-                    # f.write(f'\tCONNECTED TO: {connected_to_bool}\n')
-                    # for connected_to_node in node.connected_to:
-                    #     f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}.{connected_to_node.name}\n')
-                    # f.write(f'\tPROMOTED TO: {declared_to_bool}\n')
-                    # for connected_to_node in node.declared_to:
-                    #     f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}.{connected_to_node.name}\n')
+                        # if node.promoted_id in self.rep.promoted_to_node:
+                        #     if not isinstance(node.var, (Output, Input)):
+                        #         if np.array_equal(node.var.val, np.ones(node.var.shape)):
+                        #             f.write(f'\tWARNING: this declared variable is not a promotion or connection target with a value being set.\n')
+                        #         else:
+                        #             f.write(f'\tWARNING: this declared variable is not a promotion or connection. \n')
+                        # f.write(f'\tCONNECTED TO: {connected_to_bool}\n')
+                        # for connected_to_node in node.connected_to:
+                        #     f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}.{connected_to_node.name}\n')
+                        # f.write(f'\tPROMOTED TO: {declared_to_bool}\n')
+                        # for connected_to_node in node.declared_to:
+                        #     f.write(f'\t\t{connected_to_node.name}, {connected_to_node.unpromoted_namespace}.{connected_to_node.name}\n')
 
 
             # keep a count of every type of node in the graph for printing
@@ -408,13 +410,25 @@ class SystemGraph(object):
                         operation_analytics['elementwise']['count'] += 1
             else:
                 csdl_node = node.var
+                size = np.prod(csdl_node.shape)
+                total_var_size += np.prod(size)
+                num_vars += 1
+                if size > maximum_var_size_shape[0]:
+                    maximum_var_size_shape = (size, csdl_node.shape, node.id)
 
             if type(csdl_node) not in operation_analytics:
                 operation_analytics[type(csdl_node)] = {}
                 operation_analytics[type(csdl_node)]['count'] = 0
             operation_analytics[type(csdl_node)]['count'] += 1
 
-        return operation_analytics
+        average_var_size = total_var_size/num_vars
+        extra_data = []
+        extra_data.append(f'average variable size:   {average_var_size}')
+        extra_data.append(f'maximum variable size:   {maximum_var_size_shape[0]} {maximum_var_size_shape[1]} ({maximum_var_size_shape[2]})')
+        extra_data.append(f'number of variables  :   {num_vars}')
+        extra_data.append(f'number of scalars    :   {total_var_size}')
+
+        return operation_analytics, extra_data
     
     # @profile
     def generate_evaluation(self):
@@ -772,7 +786,7 @@ class SystemGraph(object):
         # return eval_instructions, preeval_vars, state_vals, variable_info
 
     # @profile
-    def generate_reverse(self, output_ids, input_ids):
+    def generate_reverse(self, output_ids, input_ids, vjp):
         '''
         generate the reverse mode derivative evaluation script.
         generally, loop through all variables in reverse order using
@@ -809,13 +823,17 @@ class SystemGraph(object):
         # initialize instructions
         # name of instructions
 
-
+        if not vjp:
+            get_path_name_rev = get_path_name
+        else:
+            get_path_name_rev = get_path_name_vjp
 
         # Static variables
         prerev_vars = {}
 
         # accumulation operations
         prerev_vars['DIAG_MULT'] = diag_mult
+        prerev_vars['STD_MULT'] = std_mult
 
         # Keep track of which partials have already been computed.
         # We only need to compute partial jacobians once no matter how many
@@ -861,11 +879,11 @@ class SystemGraph(object):
             }
 
             for input_id in input_ids:
-                input_path_name = get_path_name(input_id, out_id=out_id)
+                input_path_name = get_path_name_rev(input_id, out_id=out_id)
                 totals_names[out_id, input_id] = input_path_name
                 do_not_delete_paths.add(input_path_name)
 
-            do_not_delete_paths.add(get_path_name(out_id, out_id=out_id))
+            do_not_delete_paths.add(get_path_name_rev(out_id, out_id=out_id))
 
         # Go through reversed operation list
         # We guarantee is that reversed schedule is in reverse topological order, so no need for search
@@ -879,10 +897,15 @@ class SystemGraph(object):
             
             snap_num = len(self.schedules) - inverse_snap_num - 1
             # Set up code gen
-            if self.comm is None:
-                instruction_name = 'REV:'
+            if vjp:
+                instruction_name = 'REV_VJP'
             else:
-                instruction_name = f'{self.comm.rank} REV:'
+                instruction_name = 'REV_'
+
+            if self.comm is None:
+                instruction_name += ': '
+            else:
+                instruction_name += f'{self.comm.rank}: '
 
             # instruction_name = 'REV_'
             for output_name in sorted(output_ids):
@@ -1014,7 +1037,7 @@ class SystemGraph(object):
                         # Path to output
                         mpi_var_id = middle_operation.var_id
                         mpi_var = middle_operation.var
-                        path_out_name = get_path_name(mpi_var_id, out_id=out_id)
+                        path_out_name = get_path_name_rev(mpi_var_id, out_id=out_id)
                         mpi_var_size = np.prod(mpi_var.var.shape)
 
                         if isinstance(middle_operation, SendCall):
@@ -1181,7 +1204,7 @@ class SystemGraph(object):
                                 jac_function_input_id = backend_op.get_input_id(jac_function_input)
                                 path_in_name = f'{middle_operation.name}_{out_id}_{jac_function_input_id}'
                                 brack_var = self.unique_to_node[jac_function_input_id]
-                                rev_block.write(f'{path_in_name} = np.zeros(({output_size}, {np.prod(brack_var.var.shape)}))')
+                                rev_block.write(f'{path_in_name} = np.zeros(({get_reverse_seed(out_id)}.shape[0], {np.prod(brack_var.var.shape)}))')
 
                         # path_out_names are paths from output to the outputs of the jac_function operation
                         # THESE PATHS SHOULD BE FULLY COMPUTED BY NOW (unless the jac_function output is independent of output or is the output)
@@ -1190,7 +1213,7 @@ class SystemGraph(object):
                         for jac_function_output_lang in backend_op.ordered_out_names:
 
                             jac_function_output_id = backend_op.get_output_id(jac_function_output_lang)
-                            path_out_name = get_path_name(jac_function_output_id, out_id=out_id)
+                            path_out_name = get_path_name_rev(jac_function_output_id, out_id=out_id)
 
                             # This part is complicated. We feed in paths to the jac_function method.
                             # These paths SHOULD be computed by now. However, they may not be in two cases:
@@ -1255,8 +1278,8 @@ class SystemGraph(object):
                                     continue
 
                                 # Right multiplication of path
-                                path_successor = get_path_name(successor.id, out_id=out_id)
-                                path_current = get_path_name(predecessor.id, out_id=out_id)
+                                path_successor = get_path_name_rev(successor.id, out_id=out_id)
+                                path_current = get_path_name_rev(predecessor.id, out_id=out_id)
                                 partials_name = get_deriv_name(predecessor.id, successor.id)
 
                                 # We shouldn't need path_current after this operation is fully processed. As path_current is unique (?) to this operation, we can delete it.
@@ -1295,7 +1318,7 @@ class SystemGraph(object):
                         else:  # jac is function
 
                             # Right multiplication of path
-                            path_successor = get_path_name(successor.id, out_id=out_id)
+                            path_successor = get_path_name_rev(successor.id, out_id=out_id)
 
                             # Now we write the path accumulation
                             # If jac is function, partials_name already includes the path_current, so we do not multiply!
@@ -1331,7 +1354,7 @@ class SystemGraph(object):
                     # 3) If the input is NOT found in initialized_paths AND output != input (aka all other possibilities), the derivative is zero
                     for input_id in input_ids:
                         totals_name = get_deriv_name(out_id, input_id, partials=False)
-                        # input_path_name = get_path_name(input_id, out_id=out_id)
+                        # input_path_name = get_path_name_rev(input_id, out_id=out_id)
                         input_path_name = totals_names[out_id, input_id]
                         input_size = np.prod(self.unique_to_node[input_id].var.shape)
 
@@ -1388,9 +1411,7 @@ class SystemGraph(object):
         return rev_multi_instructions, prerev_vars
         # return rev_block, prerev_vars
 
-    # @profile
-    # OLD OLD OLD OLD
-    def generate_reverse_old(self, output_ids, input_ids):
+    def generate_reverse_vjp(self, output_ids, input_ids, num_vectors):
         '''
         generate the reverse mode derivative evaluation script.
         generally, loop through all variables in reverse order using
@@ -1402,6 +1423,10 @@ class SystemGraph(object):
                 list or string of UNIQUE output id(s) to take derivative of
             input_ids: list or string
                 list or string of UNIQUE input id(s) to take derivative wrt
+            vjp: bool
+                literally does nothing
+            m: integer
+                number of vectors used in the VJP
         '''
         # list of output ids and input ids to get derivatives of.
         output_ids = to_unique_list(output_ids)
@@ -1410,9 +1435,11 @@ class SystemGraph(object):
         # dictionary of ALL predecessor nodes of inputs
         # input_ancestors: input id --> set(nodes)
         input_ancestors = {}
+        all_input_ancestors = set()
         for input_id in input_ids:
-            input_ancestors[input_id] = set(nx.ancestors(self.rev_graph, self.unique_to_node[input_id]))
-
+            # input_ancestors[input_id] = set(nx.ancestors(self.rev_graph, self.unique_to_node[input_id]))
+            all_input_ancestors = all_input_ancestors.union(set(nx.ancestors(self.rev_graph, self.unique_to_node[input_id])))
+            all_input_ancestors.add(self.unique_to_node[input_id])
         # getting print statements ready
         max_outstr_len = 0
         for out_id_temp in output_ids:
@@ -1424,163 +1451,200 @@ class SystemGraph(object):
 
         # initialize instructions
         # name of instructions
-        instruction_name = 'REV:'
-        for output_name in output_ids:
-            instruction_name += f'{output_name},'
-        instruction_name += '-->'
-        for input_name in input_ids:
-            instruction_name += f'{input_name},'
-        rev_block = CodeBlock(instruction_name)
 
+        # get_path_name_rev = get_path_name
+        get_path_name_rev = get_path_name_vjp
         # Static variables
         prerev_vars = {}
 
         # accumulation operations
         prerev_vars['DIAG_MULT'] = diag_mult
+        prerev_vars['STD_MULT'] = std_mult
 
         # Keep track of which partials have already been computed.
         # We only need to compute partial jacobians once no matter how many
         # derivatives we are computing
         computed_partial_jacs = set()
 
-        # Perform modified breadth-first-search
-        # For each output:
+        # - Do not search down a node until ALL* edges leading into it has been search as well
+        # - Do not search down an implicit output untill ALL* implicit outputs have been searched
+        # - * All edges dependent on the output
+        fully_visited = set()  # set containing nodes that were fully visited
+
+        # For print statements
+        current_op_num = 0
+        # out_str = lineup_string(f'-->', 10)
+        stride = round(self.num_ops/40)
+        if stride == 0:
+            stride = 1
+
+        # Data that contains information for each output
+        output_info_dict = {}
+        totals_names = {}
+        do_not_delete_paths = set()
+        all_descendants = set()
+        output_ids_set = set(output_ids)
+        output_nodes_set = set()
         for out_id in output_ids:
-
-            # write for reference
-            rev_block.newline()
-            rev_name = f':::::::{out_id}-->'
-            for input_name in input_ids:
-                rev_name += f'{input_name},'
-            rev_name += ':::::::'
-            rev_block.comment(rev_name)
-
-            # Get output shape
+            # Get output info
             output_node = self.unique_to_node[out_id]
             output_lang_name = output_node.name
             output_shape = output_node.var.shape
             output_size = np.prod(output_shape)
 
-            # list of initialized paths.
-            initialized_paths = set()
-
-            # We pass through each operation at most one time.
-            # Keep track of this here.
-            processed_operations = set()
-
             # Get all ancestors of output for checking.
             output_descendants = set(nx.descendants(self.rev_graph, output_node))
+            output_descendants = output_descendants.intersection(all_input_ancestors)
+            output_descendants.add(output_node)
 
-            # prepare string:
-            out_str = lineup_string(f'{output_lang_name}-->', max_outstr_len)
-            stride = round(self.num_ops/40)
-            if stride == 0:
-                stride = 1
+            # Update all descendants
+            all_descendants = all_descendants.union(output_descendants)
 
-            # --------- perform BFS --------- :
-            # Implement *modified* Breadth First Search
-            # - Do not search down a node until ALL* edges leading into it has been search as well
-            # - Do not search down an implicit output untill ALL* implicit outputs have been searched
-            # - * All edges dependent on the output
-            fully_visited = set()  # set containing nodes that were fully visited
-            queue = [output_node]  # list to perform BFS on in order
+            output_info_dict[out_id] = {
+                'output_node': output_node,
+                'lang_name': output_lang_name,
+                'shape': output_shape,
+                'size': output_size,
+                'id': out_id,
+                'output_descendants': output_descendants,
+                'initialized_paths': set()
+            }
 
-            # Check if output is a leaf node.
-            # If so, do not perform BFS on it as there is nothing to search through.
-            if not output_descendants:
-                queue = []
-            current_op_num = 0
-            while queue:
+            for input_id in input_ids:
+                input_path_name = get_path_name_rev(input_id, out_id=out_id)
+                totals_names[out_id, input_id] = input_path_name
+                do_not_delete_paths.add(input_path_name)
+
+            do_not_delete_paths.add(get_path_name_rev(out_id, out_id=out_id))
+
+            output_nodes_set.add(output_node)
+
+        # Go through reversed operation list
+        # We guarantee is that reversed schedule is in reverse topological order, so no need for search
+        initialized_paths = set()
+
+        if self.comm is not None:
+            rev_multi_instructions = MultiInstructions(f'rev_multiinstr_{self.comm.rank}')
+        else:
+            rev_multi_instructions = MultiInstructions(f'rev_multiinstr')       
+        
+        for inverse_snap_num, current_schedule in enumerate(reversed(self.schedules)):
+            
+
+            snap_num = len(self.schedules) - inverse_snap_num - 1
+            # Set up code gen
+            instruction_name = 'REV_VJP'
+
+            if self.comm is None:
+                instruction_name += ': '
+            else:
+                instruction_name += f'{self.comm.rank}: '
+
+            # instruction_name = 'REV_'
+            for output_name in sorted(output_ids):
+                output_lang_name = output_info_dict[output_name]['lang_name']
+                instruction_name += f'{output_lang_name},'
+            instruction_name += '-->'
+            for input_name in input_ids:
+                instruction_name += f'{input_name},'
+            rev_block = CodeBlock(instruction_name)
+
+            # Set up code gen
+            # instruction_name = 'REV_'
+            if self.comm is not None:
+                instruction_name += f'_rank{self.comm.rank}'
+            if self.checkpoints_bool:
+                instruction_name += f'_snap{snap_num}'
+            rev_single_instructions= SingleInstruction(instruction_name)
+
+            # Initialize seeds
+            if inverse_snap_num == 0:
+                for out_id in output_ids:
+                    rev_block.write(f'{get_path_name_rev(out_id)} = {get_reverse_seed(out_id)}')
+                    initialized_paths.add(get_path_name_rev(out_id))
+
+            # Main loop
+            for current_node in reversed(list(current_schedule)):
                 # search downstream of node 'current'
-                # Node 'current' HAS to be a variable
+                # Node 'current' is an operation
                 # queue should never contain variables that have already appeared queue before
-                current = queue.pop(0)
-                fully_visited.add(current)
+                middle_operation = current_node
 
-                # Get the operation which outputs variable 'current'
-                # variable 'successor's --> operation 'middle_operation' --> variable 'current'
-                middle_operations = self.rev_graph.successors(current)
-                middle_operation_list = list(middle_operations)
-                if len(middle_operation_list) != 1:
+                # print(self.comm.rank, middle_operation)
+                if not isinstance(middle_operation, (OperationNode, PointToPointCall)):
                     # dev error. This error should have been caught way earlier. if triggered, something is wrong with compiler.
-                    raise ValueError(f'Variable {current} has {len(middle_operation_list)} predecessors.')
-                middle_operation = middle_operation_list[0]  # should be of type OperationNode
-                backend_op = middle_operation.back_operation
-                if not isinstance(middle_operation, OperationNode):
-                    # dev error. This error should have been caught way earlier. if triggered, something is wrong with compiler.
-                    raise ValueError(f'Variable {current} predecessor {middle_operation} is not an operation!')
+                    raise ValueError(f'{middle_operation} must be an operation/MPI call!')
+
+                # print(current_node.name)
+                # # Make sure successors are visited?
+                # for successor_var in self.rev_graph.successors(middle_operation):
+                #     print(successor_var.name)
+                #     fully_visited.add(successor_var)
 
                 # We only pass through operations once. Therefore, if we already computed it,
                 # do not pass through again!
-                if middle_operation in processed_operations:
-                    continue
+                # **should NEVER trigger**
+                # if middle_operation in processed_operations:
+                #     continue
 
-                # check if the operation is fully visited.
-                # Make sure all outputs of the operation have had their respective paths completed.
-                op_fully_visited = True
-                for middle_op_predecessor in self.rev_graph.predecessors(middle_operation):
+                # check if we need to propagate derivatives through this operation
+                # If this operation is independent of all outputs and inputs, skip it
+                needs_propagation = False
+                if isinstance(middle_operation, (OperationNode)):
+                    for out_id in output_info_dict.keys():
+                        output_descendants = output_info_dict[out_id]['output_descendants']
+                        if middle_operation in output_descendants:
+                            needs_propagation = True
+                elif isinstance(middle_operation, (PointToPointCall)):
+                    for out_id in output_info_dict.keys():
+                        output_descendants = output_info_dict[out_id]['output_descendants']
+                        if middle_operation.var in output_descendants:
+                            needs_propagation = True
 
-                    # middle_op_predecessor are the outputs of the middle operation
-
-                    # First, if middle_op_predecessor is not connected to the current output, we
-                    # will never visit it so ignore it.
-                    ignore_pred = True
-                    if output_node == middle_op_predecessor:
-                        ignore_pred = False
-                    elif middle_op_predecessor in output_descendants:
-                        ignore_pred = False
-                    if ignore_pred:
-                        continue
-
-                    # output is now dependent on middle_op_predecessor.
-                    # if middle_op_predecessor is NOT in fully_visited, this operation is
-                    # not ready to process
-                    if middle_op_predecessor not in fully_visited:
-                        op_fully_visited = False
-
-                # If this operation's output paths are incomplete, do not compute the partials
-                if not op_fully_visited:
+                    # if needs_propagation:
+                    #     print('YES!!')
+                    # else:
+                    #     print('NO!!')
+                # for input_id in input_ancestors:
+                #     if middle_operation in input_ancestors:
+                #         needs_propagation = True
+                # If this operation is independent of all outputs and inputs, skip it
+                if not needs_propagation:
                     continue
 
                 # if program reaches here, middle_operation has been fully visited so we now process it
-                processed_operations.add(middle_operation)
-
                 # cool print statements:
                 current_op_num += 1
-                if current_op_num == 1:
-                    print_loading(
-                        out_str,
-                        current_op_num,
-                        self.num_ops,
-                        False)
-
-                if (current_op_num) % stride == 0:
-                    print_loading(
-                        out_str,
-                        current_op_num,
-                        self.num_ops,
-                        False)
 
                 # :::::GENERATE CODE FOR MIDDLE_OPERATION:::::
-                # Two things to do:
-                # 1) Compute partials of the operation.
-                # 2) Add partials to path.
-                # Note that 1) is only done once per operation; we do not need
-                # to compute partials of an operation more than once.
+                # If operation:
+                    # Two things to do:
+                    # 1) Compute partials of the operation.
+                    # 2) Add partials to path.
+                    # Note that 1) is only done once per operation; we do not need
+                    # to compute partials of an operation more than once.
 
-                # 1) Compute partials:
-                # We only compute operation partials if the output variables have been fully visited
-                # If so...
-                # there are two ways to compute partials:
-                # 1a) Compute the Jacobian matrix independent of paths_out: called once per script
-                # --- Standard Explicit Operations
-                # --- CustomExplicitOperations: Compute Derivatives
-                # 1b) Compute the mat-mat / mat-vec product as a function of paths_out: called once per output
-                # --- ImplicitOperations: Adjoint method
-                # --- CustomExplicitOperations: Compute Jacvec Product
-                # --- CustomImplicitOperations: Adjoint method (?)
+                    # 1) Compute partials:
+                    # there are three ways to compute partials:
+                    # 1a) Compute the Jacobian matrix independent of paths_out: called once per script
+                    # --- Standard Explicit Operations
+                    # --- CustomExplicitOperations: Compute Derivatives
+                    # 1b) Compute the mat-mat / mat-vec product as a function of paths_out: called once per output
+                    # --- ImplicitOperations: Adjoint method
+                    # --- CustomExplicitOperations: Compute Jacvec Product
+                    # --- CustomImplicitOperations: Adjoint method (?)
 
-                # check 1a) or 1b)
+                # if MPI communication:
+                    # 1) get path out if it has been computed or initialize it
+                    # 2) Write adjoint of MPI call of path out 
+
+                # For each output:
+                # print('current operation: ', middle_operation.name)
+                # Deallocate variables after this operation is processed
+                variable_names_to_delete = set()
+
+                # If code reach here, middle_operation is an operation node, not an MPI node.
+                backend_op = middle_operation.back_operation
                 if not backend_op.jac_is_function:  # 1a)
 
                     if not middle_operation in computed_partial_jacs:
@@ -1597,6 +1661,17 @@ class SystemGraph(object):
 
                                 partials_dict[predecessor, successor] = {}
                                 partials_dict[predecessor, successor]['name'] = partials_name
+
+                                # Deallocate partials once they are processed
+
+                                if self.lazy:
+                                    variable_names_to_delete.add(partials_name)
+                                else:
+                                    if not backend_op.linear:
+                                        variable_names_to_delete.add(partials_name)
+
+                                # if not backend_op.linear:
+                                    # variable_names_to_delete.add(partials_name)
 
                         partials_block = CodeBlock(backend_op.name + f'_{partials_name}')
                         vars = {}
@@ -1618,8 +1693,21 @@ class SystemGraph(object):
                         # elif (pred_size < 100 and succ_size < 100) and is_sparse_jac:
                         #     print(is_sparse_jac, f'({succ_size} x {pred_size})', middle_operation.op)
 
-                        backend_op.get_partials(partials_dict, partials_block, vars, is_sparse_jac)
+                        lazy = self.lazy
 
+                        backend_op.get_partials(
+                            partials_dict = partials_dict,
+                            partials_block = partials_block,
+                            vars = vars,
+                            is_sparse_jac = is_sparse_jac,
+                            lazy = lazy,
+                        )
+                        # backend_op.get_partials(
+                        #     partials_dict = partials_dict,
+                        #     partials_block = partials_block,
+                        #     vars = vars,
+                        #     is_sparse_jac = is_sparse_jac,
+                        # )
                         # # write to script
                         # rev_block.write(partials_block)
                         prerev_vars.update(vars)
@@ -1628,32 +1716,36 @@ class SystemGraph(object):
                         rev_block.write(backend_op.op_summary_block)
                         # if the input shapes are not matching, reshape (hopefully not needed)
                         if backend_op.needs_input_reshape:
-                            rev_block.write(backend_op.reshape_block)
+                            if not backend_op.linear:
+                                rev_block.write(backend_op.reshape_block)
                         # the main evaluation script is written here.
                         rev_block.write(partials_block)
                         # if the input shapes are not matching, reshape it back to original shape (hopefully not needed)
                         if backend_op.needs_input_reshape:
-                            rev_block.write(backend_op.unreshape_block)
+                            if not backend_op.linear:
+                                rev_block.write(backend_op.unreshape_block)
+                                # rev_block.write(f'{backend_op.linear}')
+
 
                 else:  # 1b)
 
                     # compute partials as a function of output paths
-                    partials_block = CodeBlock(backend_op.name + f'_{out_id}_{middle_operation.name}')
+                    partials_block = CodeBlock(backend_op.name + f'_{middle_operation.name}')
                     vars = {}
 
                     # path_in_names are paths from output passing through the jac_function operation
                     path_in_names = []
                     for jac_function_input in backend_op.ordered_in_names:
                         jac_function_input_id = backend_op.get_input_id(jac_function_input)
-                        path_in_name = f'{middle_operation.name}_{out_id}_{jac_function_input_id}'
+                        path_in_name = f'{middle_operation.name}_{jac_function_input_id}'
                         path_in_names.append(path_in_name)
                     # need for edge case with bracketed search with csdl variables.
                     if isinstance(backend_op.operation, BracketedSearchOperation):
                         for jac_function_input in backend_op.ordered_in_brackets:
                             jac_function_input_id = backend_op.get_input_id(jac_function_input)
-                            path_in_name = f'{middle_operation.name}_{out_id}_{jac_function_input_id}'
+                            path_in_name = f'{middle_operation.name}_{jac_function_input_id}'
                             brack_var = self.unique_to_node[jac_function_input_id]
-                            rev_block.write(f'{path_in_name} = np.zeros(({output_size}, {np.prod(brack_var.var.shape)}))')
+                            rev_block.write(f'{path_in_name} = np.zeros(({num_vectors}, {np.prod(brack_var.var.shape)}))')
 
                     # path_out_names are paths from output to the outputs of the jac_function operation
                     # THESE PATHS SHOULD BE FULLY COMPUTED BY NOW (unless the jac_function output is independent of output or is the output)
@@ -1662,7 +1754,7 @@ class SystemGraph(object):
                     for jac_function_output_lang in backend_op.ordered_out_names:
 
                         jac_function_output_id = backend_op.get_output_id(jac_function_output_lang)
-                        path_out_name = get_path_name(jac_function_output_id)
+                        path_out_name = get_path_name_rev(jac_function_output_id)
 
                         # This part is complicated. We feed in paths to the jac_function method.
                         # These paths SHOULD be computed by now. However, they may not be in two cases:
@@ -1671,21 +1763,40 @@ class SystemGraph(object):
 
                         if path_out_name not in initialized_paths:
                             if self.unique_to_node[jac_function_output_id] in output_descendants:
-                                raise ValueError(f'path output {jac_function_output_id} of jac_function operation {middle_operation.name} should have been computed but is not.')
-                            if jac_function_output_id == out_id:
-                                rev_block.write(f'{path_out_name} = np.eye({output_size})')
-                            else:
+                                if self.unique_to_node[jac_function_output_id] != output_node:
+                                    raise ValueError(f'path output {jac_function_output_id} of jac_function operation {middle_operation.name} should have been computed but is not.')
+                            if not (jac_function_output_id in output_ids_set):
                                 implicit_out_size = np.prod(self.unique_to_node[jac_function_output_id].var.shape)
-                                rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {implicit_out_size}))')
+                                rev_block.write(f'{path_out_name} = np.zeros(({num_vectors}, {implicit_out_size}))')
+                                # rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {implicit_out_size}))')
+                                # rev_block.write(f'{path_out_name} = sp.csc_matrix(({output_size}, {implicit_out_size}))')
+
+
+                                # rev_block.write(f'{path_out_name} = sp.eye({output_size}, format = \'csr\')')
+                        
+                        #     if jac_function_output_id in output_ids_set:
+                        #         c_out_size = np.prod(self.unique_to_node[jac_function_output_id].var.shape)
+                        #         rev_block.write(f'{path_out_name} = {get_reverse_seed(jac_function_output_id)}@np.eye({c_out_size})')
+                        #         # rev_block.write(f'{path_out_name} = sp.eye({output_size}, format = \'csr\')')
+                        #     else:
+                        #         implicit_out_size = np.prod(self.unique_to_node[jac_function_output_id].var.shape)
+                        #         rev_block.write(f'{path_out_name} = np.zeros(({num_vectors}, {implicit_out_size}))')
+                        #         # rev_block.write(f'{path_out_name} = np.zeros(({output_size}, {implicit_out_size}))')
+                        #         # rev_block.write(f'{path_out_name} = sp.csc_matrix(({output_size}, {implicit_out_size}))')
+                        # else:
+                        #     if jac_function_output_id in output_ids_set:
+                        #         c_out_size = np.prod(self.unique_to_node[jac_function_output_id].var.shape)
+                        #         rev_block.write(f'{path_out_name} += {get_reverse_seed(jac_function_output_id)}@np.eye({c_out_size})')
+                        #         # rev_block.write(f'{path_out_name} = sp.eye({output_size}, format = \'csr\')')
 
                         path_out_names.append(path_out_name)
+                        variable_names_to_delete.add(path_out_name)
 
                     # compute and write to script
                     backend_op.get_accumulation_function(path_in_names, path_out_names, partials_block, vars)
                     rev_block.write(partials_block)
                     prerev_vars.update(vars)
-
-                # rev_block.write('start = time.time()')
+                
                 # 2) Adding partials to a path:
                 # again, if we have jacobian as a matrix, right multiply to a path and add.
                 # on the other hand, if we have jacobian as a function just add as it is already right-multiplied.
@@ -1697,12 +1808,15 @@ class SystemGraph(object):
                     for input_id in input_ids:
                         if input_id == successor.id:
                             ignore_successor = False
-                        elif successor in input_ancestors[input_id]:
-                            # elif nx.has_path(self.rev_graph, successor, self.unique_to_node[input_id]):
-                            ignore_successor = False
+                        # elif successor in input_ancestors[input_id]:
+                        #     # elif nx.has_path(self.rev_graph, successor, self.unique_to_node[input_id]):
+                        #     ignore_successor = False
+                    if successor in all_input_ancestors:
+                        ignore_successor = False
                     if ignore_successor:
                         continue
 
+                    # Accumulate matmats
                     if not backend_op.jac_is_function:  # if we have the jacobian matrix, right multiply
 
                         # Iterate through each individual jac if matrix
@@ -1712,25 +1826,42 @@ class SystemGraph(object):
 
                             # If predecessor is independent of output, there will be no path so ignore.
                             compute_path_pred = False
-                            if output_node == predecessor:
+                            # if output_node == predecessor:
+                            if predecessor in output_nodes_set:
                                 compute_path_pred = True
-                            elif predecessor in output_descendants:
+                            elif predecessor in all_descendants:
                                 compute_path_pred = True
                             if not compute_path_pred:
                                 continue
-
+                            
                             # Right multiplication of path
-                            path_successor = get_path_name(successor.id)
-                            path_current = get_path_name(predecessor.id)
+                            path_successor = get_path_name_rev(successor.id)
+                            path_current = get_path_name_rev(predecessor.id)
                             partials_name = get_deriv_name(predecessor.id, successor.id)
 
-                            # If this is the first iteration in BFS, we need to set seed for output
-                            if predecessor == output_node:
-                                # The line below had issues with pointers.
-                                initialized_path_string = get_init_path_string(partials_name, backend_op, self.sparsity_type)
-                                rev_block.write(f'{path_successor} = {initialized_path_string}')
-                                initialized_paths.add(path_successor)
-                                continue
+                            # We shouldn't need path_current after this operation is fully processed. As path_current is unique (?) to this operation, we can delete it.
+                            variable_names_to_delete.add(path_current)
+
+
+                            # # If this is the first iteration in BFS, we need to set seed for output
+                            # if path_successor not in initialized_paths:
+                            #     if predecessor in output_nodes_set:
+                            #         # The line below had issues with pointers.
+                            #         # initialized_path_string = get_init_path_string(partials_name, backend_op, self.sparsity_type)
+                            #         if path_current in initialized_paths:
+                            #             rev_block.write(f'{path_current} += {get_reverse_seed(predecessor.id)}')
+                            #             initialized_path_string = get_successor_path_string(path_current, partials_name, backend_op)
+                            #         else:
+                            #             initialized_path_string = get_successor_path_string(get_reverse_seed(predecessor.id), partials_name, backend_op)
+                            #         rev_block.write(f'{path_successor} = {initialized_path_string}')
+                            #         initialized_paths.add(path_successor)
+                            #         continue
+                            # else:
+                            #     if predecessor in output_nodes_set:
+                            #         initialized_path_string = get_successor_path_string(get_reverse_seed(predecessor.id), partials_name, backend_op)
+                            #         rev_block.write(f'{path_successor} += {initialized_path_string}')
+                            #     # initialized_paths.add(path_successor)
+                            #     # continue
 
                             if path_current not in initialized_paths:
                                 # path_current should be calculated already. if not, :(
@@ -1754,11 +1885,11 @@ class SystemGraph(object):
                     else:  # jac is function
 
                         # Right multiplication of path
-                        path_successor = get_path_name(successor.id)
+                        path_successor = get_path_name_rev(successor.id)
 
                         # Now we write the path accumulation
                         # If jac is function, partials_name already includes the path_current, so we do not multiply!
-                        successor_string = f'{middle_operation.name}_{out_id}_{successor.id}'
+                        successor_string = f'{middle_operation.name}_{successor.id}'
 
                         if path_successor not in initialized_paths:
                             # if path_successor not yet initialized, set it.
@@ -1767,66 +1898,67 @@ class SystemGraph(object):
                         else:
                             # if path_successor has been initialized, add the path.
                             rev_block.write(f'{path_successor} += {successor_string}')
+                # Delete all variables that are no longer needed
+                for deallocate_var in variable_names_to_delete:
+                    # continue
+                    if deallocate_var not in do_not_delete_paths:
+                        # rev_block.write(f'{deallocate_var} = None')
+                        rev_block.write(f'del {deallocate_var}')
 
-                    # Determine whether this successor is ready to travel down for BFS.
-                    # We check by making sure all of successor's direct predecessor variables are in 'fully_visited'
-                    queue_successor = True
-                    for successors_predecessor_op in self.rev_graph.predecessors(successor):
-                        for successors_predecessor in self.rev_graph.predecessors(successors_predecessor_op):
-                            # successors_predecessor is a variable upstream
-
-                            # if successors_predecessor not related to output, ignore it
-                            if successors_predecessor not in output_descendants:
-                                continue
-
-                            # if successors_predecessor is related to output and not visited, wait.
-                            if successors_predecessor not in fully_visited:
-                                queue_successor = False
-
-                    # If so, add successor to the queue
-                    if queue_successor:
-                        # if successor.promoted_id[0] != '_':
-                        #     print(successor.promoted_id, successor.var.shape)
-
-                        # # successor may be fully visited more than once if MiSo operation
-                        if successor in fully_visited:
-                            raise ValueError(f'Cannot re-queue successor {successor}.')
-
-                        is_leaf_node = (self.rev_graph.out_degree(successor) == 0)
-                        # If successor is a leaf node, we don't need to add it to queue.
-                        # Remember queue stores list of nodes to perform BFS on
-                        if not is_leaf_node:
-                            queue.append(successor)
-
-                # rev_block.write('fma_time += time.time()-start')
-
-            # Finally, set the derivatives
-            # There are three possible cases for setting the derivatives:
-            # 1) If the input is found in initialized_paths, the derivative is the path
-            # 2) If the input is NOT found in initialized_paths AND output == input, the derivative is identity
-            # 3) If the input is NOT found in initialized_paths AND output != input (aka all other possibilities), the derivative is zero
-            for input_id in input_ids:
-                totals_name = get_deriv_name(out_id, input_id, partials=False)
-                input_path_name = get_path_name(input_id)
-
-                if input_path_name in initialized_paths:  # case 1:
-                    rev_block.write(f'{totals_name} = {input_path_name}.copy()')
-                elif input_id == out_id:  # case 2:
-                    rev_block.comment(f'{totals_name} = identity')
-                    prerev_vars[totals_name] = np.eye(output_size)
-                else:  # case 3:
-                    rev_block.comment(f'{totals_name} = zero')
+            if snap_num == 0:
+                for input_id in input_ids:
+                    input_path_name = get_path_name_rev(input_id)
+                    # input_path_name = totals_names[out_id, input_id]
                     input_size = np.prod(self.unique_to_node[input_id].var.shape)
-                    prerev_vars[totals_name] = np.zeros((output_size, input_size))
 
-            # print statement
-            print_loading(
-                out_str,
-                current_op_num,
-                self.num_ops,
-                True)
+                    if input_size*num_vectors > 5000:
+                        use_sparse = True
+                    else:
+                        use_sparse = False
 
-        return rev_block, prerev_vars
+                    if input_path_name in initialized_paths:  # case 1:
+                        rev_block.write(f'{input_path_name} = {input_path_name}.copy()')
+                    elif input_id in output_ids_set:  # case 2:
+                        rev_block.comment(f'{input_id} = identity')
+                        rev_block.write(f'{input_path_name} = {get_reverse_seed(input_id)}')
+                    else:  # case 3:
+                        rev_block.comment(f'{input_path_name} = zero')
+                        if use_sparse:
+                            # prerev_vars[totals_name] = sp.csr_array((output_size, input_size))
+                            # rev_block.write(f'{totals_name} = {get_reverse_seed(out_id)}*0.0')
+                            rev_block.write(f'{input_path_name} = sp.csr_array(({num_vectors}, {input_size}))')
+                        else:
+                            # prerev_vars[totals_name] = np.zeros((output_size, input_size))
+                            # rev_block.write(f'{totals_name} = {get_reverse_seed(out_id)}*0.0')
+                            rev_block.write(f'{input_path_name} = np.zeros(({num_vectors},{input_size}))')
+
+            # Compile single instruction
+            rev_single_instructions.script.write(rev_block)
+            rev_single_instructions.compile()
+
+            if self.checkpoints_bool:
+                current_eval_instruction = self.checkpoint_data[snap_num]['single instructions']
+                current_del_vars = self.checkpoint_data[snap_num]['del vars']
+                current_del_vars_deriv = self.checkpoint_data[snap_num]['del vars during deriv']
+                rev_multi_instructions.add_single_instruction(current_eval_instruction, current_del_vars_deriv)
+                # rev_multi_instructions.add_single_instruction(rev_single_instructions, set())
+                rev_multi_instructions.add_single_instruction(rev_single_instructions, current_del_vars)
+            else:
+                rev_multi_instructions.add_single_instruction(rev_single_instructions, set())
+
+        # print statement
+        # print_loading(
+        #     out_str,
+        #     current_op_num,
+        #     self.num_ops,
+        #     True)
+
+        # exit('EXIT')
+        # for key in prerev_vars:
+        #     print(f'{key=}')
+        return rev_multi_instructions, prerev_vars
+        # return rev_block, prerev_vars
+
 
     def replace_brackets_lang_var_to_rep_var(self, bracket_node):
         # iterate through brackets map to see if there are any matching variables.
@@ -1873,8 +2005,17 @@ def get_successor_path_string(
         # specialized diagonal multiplication
         return f'DIAG_MULT({path_current},{partials_name})'
     else:
-        # standard multiplication
+        return f'STD_MULT({path_current},{partials_name})'
+
         return f'{path_current}@{partials_name}'
+
+        # standard multiplication
+        string = f'\nimport time\n'
+        string += f's = time.time()\n'
+        string += f'{path_current}@{partials_name}\n'
+        string += f'end = time.time()\n'
+        string += f'print(\'TIME\', end-s)\n'
+        return string
 
 
 def get_init_path_string(partials_name, backend_op, sparsity_type):
@@ -1898,7 +2039,6 @@ def get_init_path_string(partials_name, backend_op, sparsity_type):
 # def initialize_seed_path(output_seed, partials_name):
     
     
-
 def get_operation_sparsity(backend_op, sparsity_type):
     """
     returns True or False on whether operation partials should be sparse or dense

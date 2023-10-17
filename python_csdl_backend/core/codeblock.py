@@ -143,7 +143,8 @@ class CodeBlock():
         """
         saves code as python file.
         """
-        file_name = self.name + '.py'
+        name = self.name[0:150]
+        file_name = name + '.py'
         with open(file_name, "w") as text_file:
             text_file.write(self.to_string())
 

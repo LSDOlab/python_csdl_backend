@@ -5,7 +5,7 @@ from python_csdl_backend.operations.parallel.point_to_point import get_comm_node
 from python_csdl_backend.core.instructions import SingleInstruction
 from python_csdl_backend.core.operation_map import csdl_to_back_map
 from python_csdl_backend.core.systemgraph import SystemGraph
-from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, lineup_string, set_opt_upper_lower, set_scaler_array, analyze_dict_memory, get_reverse_seed, get_path_name, get_csdl_type_string
+from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, lineup_string, set_opt_upper_lower, set_scaler_array, analyze_dict_memory, get_reverse_seed, get_path_name, get_csdl_type_string, get_path_name_vjp
 from python_csdl_backend.utils.custom_utils import check_not_implemented_args
 import warnings
 from numbers import Number
@@ -338,7 +338,7 @@ class Simulator(SimulatorBase):
         # :::::ANALYTICS:::::
         if self.analytics:
             # loop through operations and stuff
-            operation_analytics = self.system_graph.get_analytics(name)
+            operation_analytics, extra_data = self.system_graph.get_analytics(name)
 
             # print some stuff
             isdag = nx.is_directed_acyclic_graph(self.system_graph.eval_graph)
@@ -348,6 +348,9 @@ class Simulator(SimulatorBase):
             for op_type in operation_analytics:
                 count = operation_analytics[op_type]['count']
                 print(f'operation count: {count}\t type: {op_type}')
+
+            for other_data in extra_data:
+                print(other_data)
             print('GRAPH PROCESSED')
         # :::::ANALYTICS:::::
 
@@ -461,7 +464,7 @@ class Simulator(SimulatorBase):
         # self.vec_num_df_calls = []
         # self.vec_num_vectorized_df_calls = []
 
-    def _generate_adjoint(self, outputs, inputs):
+    def _generate_adjoint(self, outputs, inputs, vjp_vectors):
         '''
         given a list of outputs and inputs, creates the script for the adjoint.
         '''
@@ -471,10 +474,15 @@ class Simulator(SimulatorBase):
         input_names = to_unique_list(inputs)
 
         # name of instructions
+        if vjp_vectors:
+            adj_name = f'VJP_{vjp_vectors}_'
+        else:
+            adj_name = ''
+            
         if self.comm:
-            adj_name = f'DERIVATIVES_{self.comm.rank}_'
+            adj_name += f'DERIVATIVES_{self.comm.rank}_'
         else: 
-            adj_name = 'DERIVATIVES'
+            adj_name += 'DERIVATIVES'
         for output_name in output_names:
             adj_name += f'{output_name},'
         adj_name = adj_name.rstrip(adj_name[-1])
@@ -500,7 +508,10 @@ class Simulator(SimulatorBase):
 
         # generate script
         print(f'\ngenerating: {adj_name}')
-        adj_instructions, pre_vars = self.system_graph.generate_reverse(output_ids, input_ids)
+        if vjp_vectors == False:
+            adj_instructions, pre_vars = self.system_graph.generate_reverse(output_ids, input_ids, False)
+        else:
+            adj_instructions, pre_vars = self.system_graph.generate_reverse_vjp(output_ids, input_ids, vjp_vectors)
 
         # write the computation steps
         # adj_instructions.script.write(rev_script)
@@ -614,7 +625,7 @@ class Simulator(SimulatorBase):
         return new_states
     
     # @profile
-    def _generate_totals(self, of, wrt):
+    def _generate_totals(self, of, wrt, vjp_vectors = False):
         '''
         generate derivatives
         '''
@@ -625,15 +636,18 @@ class Simulator(SimulatorBase):
         self.check_variable_existence(ofs)
         self.check_variable_existence(wrts)
 
-        hash_key = (tuple(ofs), tuple(wrts))
+        if vjp_vectors != False:
+            hash_key = (f'__VJP__{vjp_vectors}', tuple(ofs), tuple(wrts))
+        else:
+            hash_key = (tuple(ofs), tuple(wrts))
 
-        exec, vars = self._generate_adjoint(ofs, wrts)
+        exec, vars = self._generate_adjoint(ofs, wrts, vjp_vectors)
 
         self.derivative_instructions_map[hash_key] = {}
         self.derivative_instructions_map[hash_key]['precomputed_vars'] = vars
         self.derivative_instructions_map[hash_key]['executable'] = exec
 
-    def get_totals_key(self, of, wrt):
+    def get_totals_key(self, of, wrt, vjp_vectors = False):
         """
         given of, wrt, for derivatives checks to see if execution script exists. If not, create one.
         If so, return the derivative key.
@@ -645,7 +659,10 @@ class Simulator(SimulatorBase):
         # key of output/wrt combination.
         ofs = to_unique_list(of)
         wrts = to_unique_list(wrt)
-        hash_key = (tuple(ofs), tuple(wrts))
+        if vjp_vectors != False:
+            hash_key = (f'__VJP__{vjp_vectors}', tuple(ofs), tuple(wrts))
+        else:
+            hash_key = (tuple(ofs), tuple(wrts))
 
         # check to see if variables exist
         self.check_variable_existence(ofs)
@@ -654,7 +671,7 @@ class Simulator(SimulatorBase):
         # If the has key has not been found, generate totals
         if hash_key not in self.derivative_instructions_map:
             print(hash_key, ' not found, generating...')
-            self._generate_totals(ofs, wrts)
+            self._generate_totals(ofs, wrts, vjp_vectors = vjp_vectors)
 
         return hash_key, ofs, wrts
     
@@ -730,28 +747,35 @@ class Simulator(SimulatorBase):
 
         # Return computed totals
         return_dict = {}
-        for of_name in ofs:
+        if not vjps is not None:
+            for of_name in ofs:
+                for wrt_name in wrts:
+                    of_id = self._find_unique_id(of_name)
+                    wrt_id = self._find_unique_id(wrt_name)
+                    var_local_name = get_deriv_name(of_id, wrt_id, partials=False)
+                    current_derivative = totals_dict[var_local_name]
+
+                    if isinstance(current_derivative, np.matrix):
+                        current_derivative = np.asarray(current_derivative)
+
+                    if self.comm is not None:
+                        wrt_node = self.system_graph.unique_to_node[wrt_id]
+                        owner_rank = self.system_graph.variable_owner_map[wrt_id]
+                        current_derivative = self.comm.bcast(current_derivative, root = owner_rank)
+
+                    if var_local_name in totals_dict:
+                        if return_format == '[(of, wrt)]':
+                            return_dict[(of_name, wrt_name)] = current_derivative
+                        elif return_format == '[of][wrt]' or return_format == 'dict':
+                            if of_name not in return_dict:
+                                return_dict[of_name] = {}
+                            return_dict[of_name][wrt_name] = current_derivative
+        else:
+            return_dict = {}
             for wrt_name in wrts:
-                of_id = self._find_unique_id(of_name)
                 wrt_id = self._find_unique_id(wrt_name)
-                var_local_name = get_deriv_name(of_id, wrt_id, partials=False)
-                current_derivative = totals_dict[var_local_name]
-
-                if isinstance(current_derivative, np.matrix):
-                    current_derivative = np.asarray(current_derivative)
-
-                if self.comm is not None:
-                    wrt_node = self.system_graph.unique_to_node[wrt_id]
-                    owner_rank = self.system_graph.variable_owner_map[wrt_id]
-                    current_derivative = self.comm.bcast(current_derivative, root = owner_rank)
-
-                if var_local_name in totals_dict:
-                    if return_format == '[(of, wrt)]':
-                        return_dict[(of_name, wrt_name)] = current_derivative
-                    elif return_format == '[of][wrt]' or return_format == 'dict':
-                        if of_name not in return_dict:
-                            return_dict[of_name] = {}
-                        return_dict[of_name][wrt_name] = current_derivative
+                var_local_name = get_path_name_vjp(wrt_id)
+                return_dict[wrt_name] = totals_dict[var_local_name]
         return return_dict
     # @profile
     def compute_totals(
@@ -785,6 +809,11 @@ class Simulator(SimulatorBase):
     ):
         '''
         compute vector Jacobian products (vjps).
+        ****** WARNING *******
+        This method only computes vector jacobian products for one output at a time.
+        For example, if given two vectors for y1 and y2 and an input x, this method will compute
+        two vjps for x for y1 and y2 individually.
+        ****** WARNING *******
 
         Parameters:
         -----------
@@ -796,14 +825,18 @@ class Simulator(SimulatorBase):
             return_format: str
                 (EXPERIMENTAL) what format to return derivative in.
         '''
+        # Not sure if this part is true
+        # To obtain the combined vjp of x for both y1 and y2,
+        #         add the vjps of y1 wrt x together.
+
+        if self.comm is not None:
+            raise NotImplementedError('Vector Jacobian Products are not yet implemented for parallelized models.')
 
         if not isinstance(of_vectors, dict):
             raise ValueError(f'of_vectors must be a dictionary, got {type(of_vectors)}.')
 
-        of = list(of_vectors.keys())
-        hash_key, ofs, wrts = self.get_totals_key(of, wrt)
-
         # Check to make sure that the vectors are the correct shape
+        given_m = None
         for output_name in of_vectors:
             output_id = self._find_unique_id(output_name)
             output_node = self._get_unique_node(output_id)
@@ -825,18 +858,53 @@ class Simulator(SimulatorBase):
                     of_vectors[output_name] = given_vector.reshape(output_size,1)
             else:
                 raise ValueError(f'Vector for output {output_name} is not the correct type. Expected np.ndarray, sp.sparse or number, got {type(given_vector)}.')
+            
+            # Check to make sure m integer is consistent
+            given_shape = of_vectors[output_name].shape
+            if len(given_shape) == 1:
+                current_m = 1
+            elif len(given_shape) == 2:
+                current_m = given_shape[1]
+            else:
+                raise ValueError(f'Vector for output {output_name} is not the correct shape. Expected ({output_size},m) or ({output_size},), got {given_shape}.')
+
+            if given_m is None:
+                given_m = current_m
+            else:
+                if given_m != current_m:
+                    raise ValueError(f'Vector for output {output_name} is not the correct shape. Expected ({output_size},{given_m}) got ({output_size},{current_m}). All vectors must have the same number of columns.')
 
             # Transpose for vjp
             of_vectors[output_name] = of_vectors[output_name].T
 
+        of = list(of_vectors.keys())
+        hash_key, ofs, wrts = self.get_totals_key(of, wrt, vjp_vectors=given_m)
+
         # compute vjp
-        return self._compute_totals(
+        totals =  self._compute_totals(
             hash_key,
             ofs,
             wrts,
             return_format,
             vjps = of_vectors
         )
+        return totals
+    
+        # NEED TO CHANGE return VJPs NEED TO CHANGE
+        return_vjps = {}
+        for of_wrt in totals:
+            of = of_wrt[0]
+            wrt = of_wrt[1]
+
+            # vjps are summation for now
+            if wrt not in return_vjps:
+                return_vjps[wrt] = totals[of_wrt]
+            else:
+                return_vjps[wrt] += totals[of_wrt]
+        # NEED TO CHANGE return VJPs NEED TO CHANGE
+
+        return return_vjps
+
 
     def visualize_implementation(self, depth=False):
         # TODO: TEMPORARY VISUALIZATION:

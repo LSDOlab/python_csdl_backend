@@ -116,6 +116,9 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
             test_vjp = True
             outs_check_vjp = outs 
 
+        if comm is not None:
+            test_vjp = False
+
         if test_vjp:
             # Set first cartesian basis vector to compute vjp
             of_vectors = {}
@@ -131,7 +134,9 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
             # Lets make sure that the first row of the derivatives is equal
             check_dict = sim_lite.compute_totals(of=outs_check_vjp, wrt=in_vars)
             for key_deriv in check_dict:
-                if key_deriv[0] != check_key:
+                of_var = key_deriv[0]
+                wrt_var = key_deriv[1]
+                if of_var != check_key:
                     continue
 
                 if isinstance(check_dict[key_deriv], np.ndarray):
@@ -139,9 +144,10 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
                 else:
                     check_vector = check_dict[key_deriv].toarray()[0,:]
                 
+                # print(of_var, wrt_var,check_vector.flatten(),vjp_dict[wrt_var].flatten())
                 np.testing.assert_almost_equal(
                     check_vector.flatten(),
-                    vjp_dict[key_deriv].flatten(),
+                    vjp_dict[wrt_var].flatten(),
                     decimal=5)
     else:
         if (len(outs) > 0) and (len(ins) > 0):

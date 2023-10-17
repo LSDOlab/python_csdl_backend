@@ -10,10 +10,12 @@ class Implicit(csdl.Model):
         self.parameters.declare('num_nodes2')
         self.parameters.declare('num_nodes3')
         self.parameters.declare('nlsolver')
+        self.parameters.declare('use_vjp', default=True)
         # self.parameters.declare('lsolver')
 
     def define(self):
         solver_type = self.parameters['nlsolver']
+        use_vjp = self.parameters['use_vjp']
         # solver_type = self.parameters['lsolver']
 
         num1 = self.parameters['num_nodes1']
@@ -51,7 +53,7 @@ class Implicit(csdl.Model):
 
         # SOLUTION: x [0.38742589]
         # SOLUTION: u [0.66666667]
-        solve_quadratic = self.create_implicit_operation(quadratic)
+        solve_quadratic = self.create_implicit_operation(quadratic, use_vjps=use_vjp)
         if solver_type == 'bracket':
             solve_quadratic.declare_state('x', residual='y', val=np.ones(shp)*0.2, bracket=(np.zeros(shp), 2.0*np.ones(shp)))
             solve_quadratic.declare_state('u', residual='v', val=np.ones(shp)*0.3, bracket=(np.zeros(shp), 2.0*np.ones(shp)))
@@ -133,7 +135,66 @@ def test_implicit_simple_large_nlbgs():
         totals_dict=totals_dict,
         )
 
+
+def test_implicit_simple_large_newton_vjp():
+    nn = 3
+    shp = (nn, nn, nn)
+    vals_dict = {
+        'u': np.ones(shp)*0.23013859,
+        'f': np.array([[[1.66650262]]]),
+        'x': np.ones(shp)*0.43050087,
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(num_nodes1=nn, num_nodes2=nn, num_nodes3=nn, nlsolver='newton', use_vjp = False), 
+        outs = ['u', 'f',  'x'], 
+        ins = ['d', 'b', 'c'],
+        name = 'test_implicit_simple_large_newton',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+        )
+
+
+def test_implicit_simple_large_bracketed_vjp():
+    nn = 3
+    shp = (nn, nn, nn)
+    vals_dict = {
+        'u': np.ones(shp)*0.23013859,
+        'f': np.array([[[1.66650262]]]),
+        'x': np.ones(shp)*0.43050087,
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(num_nodes1=nn, num_nodes2=nn, num_nodes3=nn, nlsolver='bracket', use_vjp = False), 
+        outs = ['u', 'f',  'x'], 
+        ins = ['d', 'b', 'c'],
+        name = 'test_implicit_simple_large_bracketed',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+        )
+
+def test_implicit_simple_large_nlbgs_vjp():
+    nn = 3
+    shp = (nn, nn, nn)
+    vals_dict = {
+        'u': np.ones(shp)*0.23013859,
+        'f': np.array([[[1.66650262]]]),
+        'x': np.ones(shp)*0.43050087,
+    }
+    totals_dict = {}
+    run_test(
+        Implicit(num_nodes1=nn, num_nodes2=nn, num_nodes3=nn, nlsolver='nlbgs', use_vjp = False), 
+        outs = ['u', 'f',  'x'], 
+        ins = ['d', 'b', 'c'],
+        name = 'test_implicit_simple_large_bracketed',
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+        )
+
 if __name__ == '__main__':
+    test_implicit_simple_large_nlbgs_vjp()
+
+    exit()
     nn = 3
     import csdl
     model = Implicit(num_nodes1=nn, num_nodes2=nn, num_nodes3=nn, nlsolver='bracket')

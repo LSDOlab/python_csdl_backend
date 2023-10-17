@@ -5,10 +5,13 @@ import numpy as np
 class Implicit(csdl.Model):
     def initialize(self):
         self.parameters.declare('nlsolver')
+        self.parameters.declare('use_vjp', default=True)
 
     def define(self):
 
         solver_type = self.parameters['nlsolver']
+        use_vjp = self.parameters['use_vjp']
+
         quadratic = csdl.Model()
         a = quadratic.declare_variable('a')
         b = quadratic.declare_variable('b')
@@ -36,7 +39,7 @@ class Implicit(csdl.Model):
         # sim.visualize_implementation()
         # exit()
 
-        solve_quadratic = self.create_implicit_operation(quadratic)
+        solve_quadratic = self.create_implicit_operation(quadratic, use_vjps = use_vjp)
         if solver_type == 'bracket':
             solve_quadratic.declare_state('x', residual='y', val=0.34, bracket=(0.0, 4.0))
         else:
@@ -90,6 +93,46 @@ def test_implicit_nlbgs():
     totals_dict = {}
     run_test(
         Implicit(nlsolver='nlbgs'), 
+        ['ax2_out', 'x'], 
+        ['a', 'b', 'c'],
+        vals_dict=vals_dict,
+        totals_dict=totals_dict
+    )
+
+def test_implicit_newton_vjp():
+    vals_dict = {'x': np.array([0.38742589])}
+    totals_dict = {}
+    run_test(
+        Implicit(
+            nlsolver='newton',
+            use_vjp = False), 
+        ['ax2_out', 'x'], 
+        ['a', 'b', 'c'],
+        vals_dict=vals_dict,
+        totals_dict=totals_dict,
+    )
+
+
+def test_implicit_brackey_vjp():
+    vals_dict = {'x': np.array([0.38742589])}
+    totals_dict = {}
+    run_test(
+        Implicit(
+            nlsolver='bracket',
+            use_vjp = False), 
+        ['ax2_out', 'x'], 
+        ['a', 'b', 'c'],
+        vals_dict=vals_dict,
+        totals_dict=totals_dict
+    )
+
+def test_implicit_nlbgs_vjp():
+    vals_dict = {'x': np.array([0.38742589])}
+    totals_dict = {}
+    run_test(
+        Implicit(
+            nlsolver='nlbgs',
+            use_vjp = False), 
         ['ax2_out', 'x'], 
         ['a', 'b', 'c'],
         vals_dict=vals_dict,

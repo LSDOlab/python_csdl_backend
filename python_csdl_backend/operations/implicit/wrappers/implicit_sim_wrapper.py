@@ -12,7 +12,11 @@ class ImplicitSimWrapper(ImplicitWrapperBase):
         res_out_map: Dict[str, Variable] = op.res_out_map  # CSDL NATIVE RESIDUALS
         expose: List[str] = op.expose  # EXPOSED VARIABLES
 
+        self.use_vjps = op.use_vjps
         # create simulator of implicit model
+
+        self.full_input_jac = not self.use_vjps # use vjps for input
+        self.full_expose_jac = not self.use_vjps # use vjps for expose
 
         implicit_checkpoints = 0
         if implicit_checkpoints:
@@ -89,12 +93,26 @@ class ImplicitSimWrapper(ImplicitWrapperBase):
             self.inputs[input]['shape'] = self.sim[input].shape
             self.inputs[input]['size'] = np.prod(self.inputs[input]['shape'])
             
-        # list of what to compute derivatives of
-        self.of_list = list(self.residuals.keys()) + list(self.exposed.keys())
-        self.wrt_list = list(self.states.keys()) + self.ordered_inputs
 
-        #  generate code for the derivatives of implicit model
-        self.sim._generate_totals(self.of_list, self.wrt_list)
+        if not self.use_vjps:
+            # list of what to compute derivatives of
+            self.of_list = list(self.residuals.keys()) + list(self.exposed.keys())
+            self.wrt_list = list(self.states.keys()) + self.ordered_inputs
+
+            #  generate code for the derivatives of implicit model
+            self.sim._generate_totals(self.of_list, self.wrt_list)
+        else:
+            # list of what to compute derivatives of
+            self.residuals_list = list(self.residuals.keys())
+            self.exposed_list = list(self.exposed.keys())
+            self.states_list = list(self.states.keys())
+            self.inputs_list = self.ordered_inputs
+
+            #  generate code for the derivatives of implicit model
+            self.sim._generate_totals(self.residuals_list, self.states_list) # For solving adjoint system
+            self.sim._generate_totals(self.exposed_list, self.states_list) # For Exposed/States
+            self.sim._generate_totals(self.residuals_list, self.inputs_list) # for Residual/Input VJPS
+
 
     def run(self):
         self.sim.run()
@@ -112,4 +130,77 @@ class ImplicitSimWrapper(ImplicitWrapperBase):
         return self.sim[state_name]
 
     def compute_totals(self):
-        return self.sim.compute_totals(self.of_list, self.wrt_list)
+        if self.use_vjps:
+            return self.sim.compute_totals(self.residuals_list, self.states_list)
+        else:
+            return self.sim.compute_totals(self.of_list, self.wrt_list)
+
+    def compute_rev_jvp(self, d_r, d_in, d_o):
+        self.sim.run()
+        for key in d_r:
+            d_r[key] = d_r[key].flatten()
+        return self.compute_vjp(d_r, d_in)
+
+        d_r_temp = {}
+        for key in d_r:
+            d_r_temp[key] = d_r[key].flatten()
+        d_in_temp = self.sim.compute_vector_jacobian_product(
+            of_vectors = d_r_temp,
+            wrt = list(d_in.keys()),
+        )
+
+        # TODO: REMOVE WHEN VECTOR JACOBIAN PRODUCTS ARE FIXED
+        for key in d_in_temp:
+            residual_name = key[0]
+            input_name = key[1]
+            
+            # Real vector jacobian products should avoid this += thing
+            d_in[input_name] += d_in_temp[key].reshape(d_in[input_name].shape)
+
+            # print(key, d_in_temp[key])
+        return d_in, d_o
+    
+    def compute_rev_jvp_exposed(self, d_exposed, d_state):
+        self.sim.run()
+
+        return self.compute_vjp(d_exposed, d_state)
+
+        d_exposed_temp = {}
+        for key in d_exposed:
+            d_exposed_temp[key] = d_exposed[key].flatten()
+        d_in_temp = self.sim.compute_vector_jacobian_product(
+            of_vectors = d_exposed_temp,
+            wrt = list(d_state.keys()),
+        )
+
+        # TODO: REMOVE WHEN VECTOR JACOBIAN PRODUCTS ARE FIXED
+        for key in d_in_temp:
+            exposed_name = key[0]
+            input_name = key[1]
+            
+            # Real vector jacobian products should avoid this += thing
+            d_in[input_name] += d_in_temp[key].reshape(d_in[input_name].shape)
+
+            # print(key, d_in_temp[key])
+        return d_in, d_o
+    
+    def compute_vjp(self, d_ofs, d_wrts):
+        d_ofs_temp = {}
+        for key in d_ofs:
+            d_ofs_temp[key] = d_ofs[key]
+        d_wrts_temp = self.sim.compute_vector_jacobian_product(
+            of_vectors = d_ofs_temp,
+            wrt = list(d_wrts.keys()),
+        )
+
+        # TODO: REMOVE WHEN VECTOR JACOBIAN PRODUCTS ARE FIXED
+        for key in d_wrts_temp:
+            of_name = key[0]
+            wrt_name = key[1]
+            
+            # Real vector jacobian products should avoid this += thing
+            print(of_name, wrt_name, d_ofs[of_name].shape, d_wrts_temp[key].shape, d_wrts[wrt_name].shape)
+            d_wrts[wrt_name] += d_wrts_temp[key].reshape(d_wrts[wrt_name].shape)
+
+            # print(key, d_in_temp[key])
+        return d_wrts, d_ofs
