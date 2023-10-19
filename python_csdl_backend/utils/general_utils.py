@@ -170,15 +170,19 @@ def analyze_dict_memory(var_dict, name, sim_name):
             if sp.issparse(var):
                 vartype = 'sparse'
                 bytesize = var.data.nbytes
-                total_size += bytesize
             elif isinstance(var, np.ndarray):
                 vartype = 'dense'
                 bytesize = var.nbytes
-                total_size += bytesize
             elif isinstance(var, tuple):
                 vartype = 'tuple'
                 bytesize = sys.getsizeof(var)
-                total_size += bytesize
+            # else:
+            #     try:
+            #         bytesize = sys.getsizeof(var)
+            #     except:
+            #         bytesize = 0
+
+            total_size += bytesize
 
             if bytesize > 10e6:
                 print('\t',key, '\t',vartype, '\t\t',f"{bytesize:,} (LARGE OBJECT)")        
@@ -195,6 +199,8 @@ def analyze_dict_memory(var_dict, name, sim_name):
             else:
                 total_size_dict['other'] += bytesize
     print(name, 'total size', f"{total_size:,}")
+    if total_size > 1e9:
+        print("~Gb ALLOCATIONS")
     for var_type in total_size_dict:
         print('-', f'{var_type} size\t', f"{total_size_dict[var_type]:,}")
 

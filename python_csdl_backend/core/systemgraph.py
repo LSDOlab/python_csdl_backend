@@ -1410,7 +1410,8 @@ class SystemGraph(object):
         #     print(f'{key=}')
         return rev_multi_instructions, prerev_vars
         # return rev_block, prerev_vars
-
+    
+    # @profile
     def generate_reverse_vjp(self, output_ids, input_ids, num_vectors):
         '''
         generate the reverse mode derivative evaluation script.
@@ -1645,7 +1646,9 @@ class SystemGraph(object):
 
                 # If code reach here, middle_operation is an operation node, not an MPI node.
                 backend_op = middle_operation.back_operation
-                if not backend_op.jac_is_function:  # 1a)
+
+                jac_is_function = backend_op.is_jac_function(vjp = True)
+                if not jac_is_function:  # 1a)
 
                     if not middle_operation in computed_partial_jacs:
 
@@ -1817,7 +1820,7 @@ class SystemGraph(object):
                         continue
 
                     # Accumulate matmats
-                    if not backend_op.jac_is_function:  # if we have the jacobian matrix, right multiply
+                    if not jac_is_function:  # if we have the jacobian matrix, right multiply
 
                         # Iterate through each individual jac if matrix
                         for predecessor in self.rev_graph.predecessors(middle_operation):

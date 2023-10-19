@@ -343,3 +343,6 @@ class OperationBase():
 
                 self.reshape_block.write(f'{in_id} = {in_id}.reshape({lang_shape})')
                 self.unreshape_block.write(f'{in_id} = {in_id}.reshape({rep_shape})')
+
+    def is_jac_function(self, vjp = False):
+        return self.jac_is_function

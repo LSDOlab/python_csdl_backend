@@ -25,7 +25,10 @@ class CrossLite(OperationBase):
         self.shape = operation.outs[0].shape
         self.in1_name = operation.dependencies[0].name
         self.in2_name = operation.dependencies[1].name
+        self.ordered_in_names = [self.in1_name, self.in2_name]
         self.out_name = operation.outs[0].name
+        self.ordered_out_names = [self.out_name]
+
         self.axis = operation.literals['axis']
         # self.in1_val = operation.dependencies[0].val
         # self.in2_val = operation.dependencies[1].val
@@ -261,5 +264,62 @@ class CrossLite(OperationBase):
         return False
 
 
+    def get_accumulation_function(self, input_paths, path_output, partials_block, vars):
+        # Here we generate code to continue jacobian accumulation given accumulated paths from output to this implicit operation
+
+        # implicit solver object
+        name = self.operation.name+'_vjp'
+        vars[name] = self.accumulate_cross_rev
+
+        # Ouput paths must be in correct order...
+        in_argument = ''
+        for inv in path_output:
+            in_argument += inv+', '
+        in_argument = in_argument.rstrip(in_argument[-1])
+        in_argument = in_argument.rstrip(in_argument[-1])
+
+        # give paths of outputs to inputs
+        partials_block.write(f'{self.operation.name}_path_in = {name}({self.get_input_id(self.in1_name)},{self.get_input_id(self.in2_name)},{in_argument})')
+
+        # Input paths must be in correct order...
+        for i, path in enumerate(input_paths):
+            partials_block.write(f'{path} = {self.operation.name}_path_in[{i}]')
+
+    def is_jac_function(self, vjp=False):
+        return vjp
+
+
+    def compute_vjp_a_b(self, a, b, vjp_z):
+        vjp_z = vjp_z.reshape(self.shape)
+
+        # Compute the VJP for vector 'a'
+        vjp_a = -np.cross(vjp_z, b, axisa = self.axis, axisb = self.axis, axisc =self.axis)
+        
+        # Compute the VJP for vector 'b'
+        vjp_b = -np.cross(a, vjp_z, axisa = self.axis, axisb = self.axis, axisc = self.axis)
+        
+        return vjp_a, vjp_b
+
+    def accumulate_cross_rev(self, a, b, vjp_z_mat):
+
+        vjp_a_mat = np.zeros((vjp_z_mat.shape[0], a.size))
+        vjp_b_mat = np.zeros((vjp_z_mat.shape[0], b.size))
+
+        to_array = False
+        if sp.issparse(vjp_z_mat):
+            to_array = True
+        for i, row in enumerate(range(vjp_z_mat.shape[0])):
+            if to_array:
+                vjp_z = vjp_z_mat[row,:].toarray()
+            else:
+                vjp_z = vjp_z_mat[row,:]
+            vjp_a, vjp_b = self.compute_vjp_a_b(a, b, vjp_z)
+            vjp_a_mat[row,:] = vjp_a.flatten()
+            vjp_b_mat[row,:] = vjp_b.flatten()
+        return vjp_a_mat, vjp_b_mat
+
+
 def get_array_indices(*shape):
     return np.arange(np.prod(shape)).reshape(shape)
+
+

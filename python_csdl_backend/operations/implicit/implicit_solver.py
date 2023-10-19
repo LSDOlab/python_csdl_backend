@@ -59,7 +59,7 @@ class ImplicitSolverBase():
         #     self.function_wrapper.set_state(state_name, self.states[state_name]['initial_val'])
 
         self.linear_solve = build_linear_solver(op.linear_solver, self.residuals)
-
+    # @profile
     def solve(self, *inputs):
         """
         given input vals in the order of self.ordered_inputs, 
