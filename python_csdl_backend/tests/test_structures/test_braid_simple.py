@@ -59,7 +59,7 @@ def get_model():
 # EVERYTHING ABOVE NEEDS EDITING
 from python_csdl_backend.tests.create_single_test import run_test
 
-def test_braid_mixed():
+def test_braid_simple():
     import numpy as np
 
     vals_dict = {
@@ -166,4 +166,23 @@ def test_braid_mixed():
     
 
 if __name__ == '__main__':
-    test_braid_mixed()
+
+    m, outputs, inputs = get_model()
+    import python_csdl_backend
+    import numpy as np
+
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+
+    sim = python_csdl_backend.Simulator(m, comm = comm, display_scripts=1, checkpoints = 0, save_vars=outputs)
+    sim.run()
+
+
+    of_vectors = {}
+    # outputs = ['x_1_o_a']
+    for of in outputs:
+        of_vectors[of] = np.ones(sim[of].shape)
+    x = sim.compute_vector_jacobian_product(of_vectors, ['x_0_p_a'])
+    # x = sim.compute_totals(outputs, ['x_0_p_a'])
+    print(x)
+    # test_braid_mixed()

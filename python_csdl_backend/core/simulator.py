@@ -775,7 +775,18 @@ class Simulator(SimulatorBase):
             for wrt_name in wrts:
                 wrt_id = self._find_unique_id(wrt_name)
                 var_local_name = get_path_name_vjp(wrt_id)
-                return_dict[wrt_name] = totals_dict[var_local_name]
+
+                # If MPI, need to broadcast
+                current_derivative = totals_dict[var_local_name]
+                if isinstance(current_derivative, np.matrix):
+                    current_derivative = np.asarray(current_derivative)
+
+                if self.comm is not None:
+                    wrt_node = self.system_graph.unique_to_node[wrt_id]
+                    owner_rank = self.system_graph.variable_owner_map[wrt_id]
+                    current_derivative = self.comm.bcast(current_derivative, root = owner_rank)
+
+                return_dict[wrt_name] = current_derivative
         return return_dict
     # @profile
     def compute_totals(
@@ -828,9 +839,6 @@ class Simulator(SimulatorBase):
         # Not sure if this part is true
         # To obtain the combined vjp of x for both y1 and y2,
         #         add the vjps of y1 wrt x together.
-
-        if self.comm is not None:
-            raise NotImplementedError('Vector Jacobian Products are not yet implemented for parallelized models.')
 
         if not isinstance(of_vectors, dict):
             raise ValueError(f'of_vectors must be a dictionary, got {type(of_vectors)}.')
@@ -1490,20 +1498,21 @@ class Simulator(SimulatorBase):
                     constraint_jac[i_lower_c:i_upper_c, i_lower_dv:i_upper_dv] = self.optimization_derivatives[c_name, dv_name]*(scaler_outer)
         return constraint_jac
 
-    def check_partials(self,
-                       out_stream=None,
-                       includes=None,
-                       excludes=None,
-                       compact_print=False,
-                       abs_err_tol=1e-6,
-                       rel_err_tol=1e-6,
-                       method='fd',
-                       step=1e-6,
-                       form='forward',
-                       step_calc='abs',
-                       force_dense=True,
-                       show_only_incorrect=False,
-                       ):
+    def check_partials(
+            self,
+            out_stream=None,
+            includes=None,
+            excludes=None,
+            compact_print=False,
+            abs_err_tol=1e-6,
+            rel_err_tol=1e-6,
+            method='fd',
+            step=1e-6,
+            form='forward',
+            step_calc='abs',
+            force_dense=True,
+            show_only_incorrect=False,
+            ):
         """
         Checks totals. SHOULD ONLY BE USED FOR UNIT TESTING IN CSDL. arguments are not used.
         """

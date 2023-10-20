@@ -116,8 +116,6 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
             test_vjp = True
             outs_check_vjp = outs 
 
-        if comm is not None:
-            test_vjp = False
 
         if test_vjp:
             # Set first cartesian basis vector to compute vjp

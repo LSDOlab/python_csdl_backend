@@ -1561,7 +1561,13 @@ class SystemGraph(object):
             # Initialize seeds
             if inverse_snap_num == 0:
                 for out_id in output_ids:
-                    rev_block.write(f'{get_path_name_rev(out_id)} = {get_reverse_seed(out_id)}')
+                    if self.comm is not None:
+                        if self.variable_owner_map[out_id] == self.comm.rank:
+                            rev_block.write(f'{get_path_name_rev(out_id)} = {get_reverse_seed(out_id)}')
+                        else:
+                            rev_block.write(f'{get_path_name_rev(out_id)} = np.zeros(({num_vectors}, {output_info_dict[out_id]["size"]}))')
+                    else:
+                        rev_block.write(f'{get_path_name_rev(out_id)} = {get_reverse_seed(out_id)}')
                     initialized_paths.add(get_path_name_rev(out_id))
 
             # Main loop
@@ -1616,6 +1622,61 @@ class SystemGraph(object):
                 # if program reaches here, middle_operation has been fully visited so we now process it
                 # cool print statements:
                 current_op_num += 1
+
+                # if MPI communication
+                if isinstance(middle_operation, (PointToPointCall)):
+                    if middle_operation.var not in all_descendants:
+                        continue
+
+                    # Path to output
+                    mpi_var_id = middle_operation.var_id
+                    mpi_var = middle_operation.var
+                    path_out_name = get_path_name_rev(mpi_var_id)
+                    mpi_var_size = np.prod(mpi_var.var.shape)
+
+                    if isinstance(middle_operation, SendCall):
+                        if path_out_name not in initialized_paths:
+                            if num_vectors*mpi_var_size > 5000:
+                                rev_block.write(f'{path_out_name} = sp.csr_array(({num_vectors}, {mpi_var_size}))')
+
+                            else:
+                                rev_block.write(f'{path_out_name} = np.zeros(({num_vectors}, {mpi_var_size}))')
+
+                            initialized_paths.add(path_out_name)
+
+                        # Write MPI adjoint
+                        path_out_name_mpi = path_out_name+'_mpi'
+                        vars = {}
+                        middle_operation.get_adjoint_call(
+                            rev_block,
+                            vars,
+                            path_out_name_mpi,
+                            (num_vectors, mpi_var_size),
+                            None,
+                        )
+                        rev_block.write(f'{path_out_name} += {path_out_name_mpi}')
+                    elif isinstance(middle_operation, RecvCall):
+                        if path_out_name not in initialized_paths:
+
+                            if num_vectors*mpi_var_size > 5000:
+                                rev_block.write(f'{path_out_name} = sp.csr_array(({num_vectors}, {mpi_var_size}))')
+                            else:
+                                rev_block.write(f'{path_out_name} = np.zeros(({num_vectors}, {mpi_var_size}))')
+
+                            initialized_paths.add(path_out_name)
+                        # Write MPI adjoint
+                        path_out_name_mpi = path_out_name
+                        vars = {}
+                        middle_operation.get_adjoint_call(
+                            rev_block,
+                            vars,
+                            path_out_name_mpi,
+                            (num_vectors, mpi_var_size),
+                            None,
+                        )
+                    prerev_vars.update(vars)
+                    continue
+
 
                 # :::::GENERATE CODE FOR MIDDLE_OPERATION:::::
                 # If operation:
@@ -2008,16 +2069,12 @@ def get_successor_path_string(
         # specialized diagonal multiplication
         return f'DIAG_MULT({path_current},{partials_name})'
     else:
+
         return f'STD_MULT({path_current},{partials_name})'
 
-        return f'{path_current}@{partials_name}'
-
         # standard multiplication
-        string = f'\nimport time\n'
-        string += f's = time.time()\n'
-        string += f'{path_current}@{partials_name}\n'
-        string += f'end = time.time()\n'
-        string += f'print(\'TIME\', end-s)\n'
+        string =  f'STD_MULT({path_current},{partials_name})\n'
+        string += f'print(\'{path_current}\',\'{partials_name}\')'
         return string
 
 
