@@ -248,10 +248,15 @@ class CustomExplicitWrapper():
             self.op.compute_jacvec_product(self.inputs, d_inputs, d_outputs, 'rev')
 
             # Replace each row of initialized path accumulation
+
+            d_in_given = set(d_inputs.keys())
             for input_name in self.ordered_in_names:
                 # print(input_name, accumulated_paths_dict[input_name][row_index, :], d_inputs)
                 accumulated_paths_dict[input_name][row_index, :] = d_inputs[input_name].flatten()
+                d_in_given.remove(input_name)
 
+            if len(d_in_given) > 0:
+                raise ValueError(f'd_inputs variables {d_in_given} are not inputs to custom explicit operation {self.op}')
         # Return in correct order.
         accumulated_paths = []
         for input in self.ordered_in_names:

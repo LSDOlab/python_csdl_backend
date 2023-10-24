@@ -34,7 +34,7 @@ class SystemGraph(object):
     When iterating through each node, if the node is another graph object, recursively call the function
 
     """
-
+    # @profile
     def __init__(self,
                  rep,
                  mode,
@@ -107,8 +107,10 @@ class SystemGraph(object):
         self.promoted_to_unpromoted = self.rep.promoted_to_unpromoted
         self.unpromoted_to_promoted = self.rep.unpromoted_to_promoted
 
+        # UNCOMMENT for potential linear preaccumulation tests 
         # combinable = 0
         # nn = 0
+        # nscalars = 0
         for node in self.eval_graph.nodes:
 
             if isinstance(node, VariableNode):
@@ -139,6 +141,11 @@ class SystemGraph(object):
                 # for pred in self.eval_graph.predecessors(node):
                 #     if pred.op.properties['linear']:
                 #         all_linear_after = True
+
+                #         if self.eval_graph.out_degree(pred) == 0:
+                #             all_linear_after = False
+                #             break
+
                 #         for successors in self.eval_graph.successors(node):
                 #             s_sizes.append(str(successors.op.properties['elementwise'])[0])
                 #             for ss in self.eval_graph.successors(successors):
@@ -150,7 +157,8 @@ class SystemGraph(object):
                 
                 # if all_linear_after:
                 #     combinable+=1
-                #     print(f'LINEAR PREACCUMULATION: {combinable}/{nn} ', np.prod(node.var.shape), s_sizes, unique_id)
+                #     nscalars += node.var.size
+                #     print(f'LINEAR PREACCUMULATION: {combinable}/{nn} ', nscalars, s_sizes, unique_id)
                 # print(all_linear_after)
 
                 other_ids = []
@@ -2067,15 +2075,13 @@ def get_successor_path_string(
 
     if backend_op.elementwise:
         # specialized diagonal multiplication
-        return f'DIAG_MULT({path_current},{partials_name})'
+        string =  f'DIAG_MULT({path_current},{partials_name})'
     else:
-
-        return f'STD_MULT({path_current},{partials_name})'
-
         # standard multiplication
-        string =  f'STD_MULT({path_current},{partials_name})\n'
-        string += f'print(\'{path_current}\',\'{partials_name}\')'
-        return string
+        string =  f'STD_MULT({path_current},{partials_name})'
+
+    # string += f'\nprint(\'{path_current}\',\'{partials_name}\')'
+    return string
 
 
 def get_init_path_string(partials_name, backend_op, sparsity_type):

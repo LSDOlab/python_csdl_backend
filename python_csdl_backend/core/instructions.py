@@ -20,7 +20,8 @@ class SingleInstruction():
 
         self.name = 'Instructions_' + name
         self.script = CodeBlock(name)
-
+    
+    # @profile
     def compile(self):
         """ 
         Converts script to string and compiles.
