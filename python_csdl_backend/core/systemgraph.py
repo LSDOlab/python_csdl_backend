@@ -17,6 +17,7 @@ from python_csdl_backend.operations.parallel.point_to_point import PointToPointC
 from python_csdl_backend.core.instructions import SingleInstruction, MultiInstructions
 
 from csdl import Operation, StandardOperation, ImplicitOperation, CustomExplicitOperation, Variable, Output, BracketedSearchOperation, CustomImplicitOperation
+from csdl.operations.solve_linear import SolveLinear
 from csdl.rep.variable_node import VariableNode
 from csdl.rep.operation_node import OperationNode
 from csdl.utils.prepend_namespace import prepend_namespace
@@ -574,7 +575,7 @@ class SystemGraph(object):
                     keep_this_var = True
 
                 for predecessor in self.eval_graph.predecessors(node):
-                    if isinstance(predecessor.op, (ImplicitOperation, CustomImplicitOperation)):
+                    if isinstance(predecessor.op, (ImplicitOperation, CustomImplicitOperation, SolveLinear)):
                         del_csdl_val = False
                         keep_this_var = True
                 

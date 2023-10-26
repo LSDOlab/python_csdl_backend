@@ -43,6 +43,7 @@ from csdl.operations.max import max
 from csdl.operations.average import average
 from csdl.operations.min import min
 from csdl.operations.bessel import bessel
+from csdl.operations.solve_linear import SolveLinear
 
 
 from csdl import CustomExplicitOperation
@@ -94,6 +95,7 @@ from python_csdl_backend.operations.max import get_max_lite
 from python_csdl_backend.operations.average import get_average_lite
 from python_csdl_backend.operations.min import get_min_lite
 from python_csdl_backend.operations.bessel import get_bessel_lite
+from python_csdl_backend.operations.linear.solve_linear import get_solve_linear_lite
 
 try:
     from csdl import its_shotime
@@ -150,6 +152,7 @@ csdl_to_back_map = {
     min: get_min_lite,
     average: get_average_lite,
     bessel: get_bessel_lite,
+    SolveLinear: get_solve_linear_lite,
     # inner : get_inner_lite,
 }
 

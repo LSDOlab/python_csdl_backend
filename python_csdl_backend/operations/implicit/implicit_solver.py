@@ -4,7 +4,7 @@ import scipy.sparse as sp
 from csdl import CustomImplicitOperation
 from python_csdl_backend.operations.implicit.wrappers.implicit_sim_wrapper import ImplicitSimWrapper
 from python_csdl_backend.operations.implicit.wrappers.implicit_custom_wrapper import ImplicitCustomWrapper
-from python_csdl_backend.operations.implicit.linear_solver import build_linear_solver
+from python_csdl_backend.operations.linear.linear_solver import build_linear_solver
 
 
 class ImplicitSolverBase():
