@@ -38,7 +38,6 @@ class LinearCombinationRightOperation(csdl.Model):
             n_array_1[1,7] = 8
             n_array_1[5,6] = 1
 
-
             n_array_2[1,1] = 6
             n_array_2[2,9] = 45
             n_array_2[7,7] = 19
@@ -237,10 +236,9 @@ def test_linear_combination_large_rtruediv():
         totals_dict=totals_dict)
     
 
-def test_linear_combination_large_rand():
+def test_linear_combination_large_random():
     nn = (10,10)
     size = 100
-
 
     n_array_1 = 2*np.ones(nn)
     n_array_2 = 3*np.ones(nn)

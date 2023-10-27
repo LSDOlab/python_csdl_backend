@@ -29,17 +29,36 @@ class LinearCombinationLite(OperationBase):
 
         # Initialize constant
         const_name = self.operation.name+'_constant'
+        start_constant = True
         if isinstance(self.constant, np.ndarray):
             vars[const_name] = self.constant.reshape(self.shape)
         else:
-            vars[const_name] = self.constant
+            if self.constant != 0:
+                vars[const_name] = self.constant
+            else:
+                start_constant = False
 
-        eval_block.write(f'{self.get_output_id(self.out_name)} = {const_name}')
+        if start_constant:
+            eval_block.write(f'{self.get_output_id(self.out_name)} = {const_name}')
+        else:
+            eval_block.write(f'{self.get_output_id(self.out_name)} = ')
 
         # write linear combination
+        num_combination = 0
         for in_name, coeff in zip(self.in_names, self.coeffs):
-            eval_block.write(f'+{coeff}*{self.get_input_id(in_name)}', linebreak=False)
+            
+            if coeff != 1:
+                coeff_str = f'{coeff}*'
+            else:
+                coeff_str = ''
 
+            if num_combination == 0 and not start_constant:
+                starting_str = ''
+            else:
+                starting_str = '+'
+            eval_block.write(f'{starting_str}{coeff_str}{self.get_input_id(in_name)}', linebreak=False)
+
+            num_combination += 1
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
         for key_tuple in partials_dict:

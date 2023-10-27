@@ -30,7 +30,6 @@ class PowerCombinationLite(OperationBase):
 
     def get_evaluation(self, eval_block, vars):
 
-        vars[self.coeff_name] = self.coeff_val
         output_name = self.get_output_id(self.out_name)
 
         i = 0
@@ -42,15 +41,31 @@ class PowerCombinationLite(OperationBase):
 
             in_name = self.get_input_id(in_name_lang)
 
-            if i == 0:
-                eval_block.write(f'{output_name} = ({in_name}**{power})')
+            if power != 1:
+                power_str = f'**{power}'
             else:
-                eval_block.write(f'*({in_name}**{power})', linebreak=False)
+                power_str = f''
+
+            if i == 0:
+                eval_block.write(f'{output_name} = ({in_name}{power_str})')
+            else:
+                eval_block.write(f'*({in_name}{power_str})', linebreak=False)
 
             i += 1
         # eval_block.write(f'print({self.coeff_name})')
         # eval_block.write(f'print(\'{output_name}\',{output_name}.shape)')
-        eval_block.write(f'{output_name} = ({output_name}*{self.coeff_name}).reshape({self.out_shape})')
+        coeff_is_one = False
+        if isinstance(self.coeff_val, np.ndarray):
+            if np.all(self.coeff_val == 1):
+                coeff_is_one = True
+        elif self.coeff_val == 1:
+            coeff_is_one = True
+
+        if not coeff_is_one:
+            vars[self.coeff_name] = self.coeff_val
+            eval_block.write(f'{output_name} = ({output_name}*{self.coeff_name}).reshape({self.out_shape})')
+        else:
+            eval_block.write(f'{output_name} = {output_name}.reshape({self.out_shape})')
 
     def get_partials(self, partials_dict, partials_block, vars, is_sparse_jac, lazy):
 
