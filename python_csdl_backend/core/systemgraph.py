@@ -271,8 +271,8 @@ class SystemGraph(object):
         if name != '':
             name_prepend = f'_{name}'
         directory_name = f'MODEL_SUMMARY{name_prepend}'
-        graph_file_name = f'{directory_name}/GRAPH.txt'
-        vars_file_name = f'{directory_name}/VARS.txt'
+        graph_file_name = f'{directory_name}/graph.txt'
+        vars_file_name = f'{directory_name}/variables.txt'
 
         if not os.path.exists(directory_name):
             os.makedirs(directory_name)
