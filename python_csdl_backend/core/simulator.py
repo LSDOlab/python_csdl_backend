@@ -230,7 +230,7 @@ class Simulator(SimulatorBase):
             checkpoints = self.checkpoints_bool,
             checkpoint_stride = checkpoint_stride,
         )
-
+        del ccl_graph
         # exit(checkpoints)
 
         schedule_new = []
@@ -455,8 +455,6 @@ class Simulator(SimulatorBase):
         # if mode == 'rev':
         #     self.graph_reversed = self.eval_graph.reverse()
         
-
-
         del self.rep
         # # TODO: REMOVE!!!!!!!!!
         # self.vec_num_f_calls = []
@@ -526,6 +524,16 @@ class Simulator(SimulatorBase):
         # adj_instructions.compile()
         return adj_instructions, pre_vars
     
+    # def delete_graph(self):
+    #     self.rep = None
+    #     self.system_graph.rep = None
+    #     # self.system_graph.eval_graph = None
+    #     for node in self.system_graph.eval_graph:
+    #         if hasattr(node, 'back_operation'):
+    #             node.back_operation = None
+
+
+
     # @profile
     def run(
             self,
@@ -1050,6 +1058,8 @@ class Simulator(SimulatorBase):
         var_list = to_unique_list(vars)
 
         for var in var_list:
+            if not isinstance(var, str):
+                raise ValueError(f'variable name must be a string, got {type(var)}')
             if not self._find_unique_id(var):
                 raise KeyError(f'cannot find variable \'{var}\'')
 

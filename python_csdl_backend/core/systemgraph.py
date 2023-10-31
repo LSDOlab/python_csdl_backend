@@ -369,16 +369,21 @@ class SystemGraph(object):
                         is_auto_var = True
                     if not is_auto_var:
                         if hasattr(node.var, 'val'):
-                            avg_val = np.mean(node.var.val)
+                            avg_val = f'{np.mean(node.var.val)}'
                         else:
-                            avg_val = None
+                            avg_val = "None"
+
+                        if self.eval_graph.in_degree(node) > 0:
+                            over = ' (overwritten):'
+                        else:
+                            over = ':              '
 
                         f.write(f'\n\n{node.id}')
                         f.write(f'\n\tname:                    {node.name}')
                         f.write(f'\n\tunpromoted name:         {prepend_namespace(node.unpromoted_namespace,node.name)}')
                         f.write(f'\n\tpromoted name:           {prepend_namespace(node.namespace,node.name)}')
                         f.write(f'\n\tshape:                   {node.var.shape}')
-                        f.write(f'\n\tavg val:                 {avg_val}')
+                        f.write(f'\n\tavg val{over}   {avg_val}')
                         f.write(f'\n\tgraph info:              {self.eval_graph.in_degree(node)} in op / {self.eval_graph.out_degree(node)} out op(s)')
                         f.write(f'\n\tconnected to:')
                         for connected_to_node in node.connected_to:

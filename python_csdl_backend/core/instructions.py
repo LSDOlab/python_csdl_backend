@@ -50,7 +50,7 @@ class SingleInstruction():
         # inputs['scipy'] = scipy
 
         locals = inputs  # Set local variables
-
+        self.script = None
         # Execute compiled code
         exec(self.codeobject, globals, locals)
 
