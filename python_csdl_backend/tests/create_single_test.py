@@ -104,8 +104,9 @@ def run_test_single(model, outs, ins, name, sparsity_case, vals_dict, totals_dic
             decimal=5)
 
     if 1:
-        # Check derivatives
         error_dict = sim_lite.check_partials(compact_print=True)
+        # Check derivatives
+        # error_dict = sim_lite.check_partials(compact_print=False)
 
         # Check vector jacobian products
         test_vjp = False
