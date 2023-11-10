@@ -544,9 +544,10 @@ class SystemGraph(object):
 
                     if not is_auto_var:
                         if promoted_id in self.promoted_to_unique:
-                            variable_info['outputs'][promoted_id] = {}
-                            variable_info['outputs'][promoted_id]['shape'] = csdl_node.shape
-                            variable_info['outputs'][promoted_id]['size'] = np.prod(csdl_node.shape)
+                            if isinstance(csdl_node, Output):
+                                variable_info['outputs'][promoted_id] = {}
+                                variable_info['outputs'][promoted_id]['shape'] = csdl_node.shape
+                                variable_info['outputs'][promoted_id]['size'] = np.prod(csdl_node.shape)
 
                             if self.checkpoints_bool:
                                 if self.save_all_outputs:
