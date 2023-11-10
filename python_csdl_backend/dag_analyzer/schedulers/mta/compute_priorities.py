@@ -27,6 +27,11 @@ def compute_furthest_weight_ahead(DAG):
         DAG.nodes[node]['FWA'] = -furthest_weight_ahead[node]
 
 def compute_shortest_weight_before(DAG):
+
+    """
+    Earliest possible start time for each node
+    """
+
     # Initialize a dictionary to keep track of the furthest weight ahead for each node
     furthest_weight_ahead = {}
 

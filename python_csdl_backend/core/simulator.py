@@ -5,7 +5,7 @@ from python_csdl_backend.operations.parallel.point_to_point import get_comm_node
 from python_csdl_backend.core.instructions import SingleInstruction
 from python_csdl_backend.core.operation_map import csdl_to_back_map
 from python_csdl_backend.core.systemgraph import SystemGraph
-from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, lineup_string, set_opt_upper_lower, set_scaler_array, analyze_dict_memory, get_reverse_seed, get_path_name, get_csdl_type_string, get_path_name_vjp
+from python_csdl_backend.utils.general_utils import format_print_number, get_deriv_name, to_unique_list, lineup_string, set_opt_upper_lower, set_scaler_array, analyze_dict_memory, get_reverse_seed, get_path_name, get_csdl_type_string, get_path_name_vjp
 from python_csdl_backend.utils.custom_utils import check_not_implemented_args
 import warnings
 from numbers import Number
@@ -346,7 +346,7 @@ class Simulator(SimulatorBase):
             if not isdag:
                 print(nx.find_cycle(self.system_graph.eval_graph))
             for op_type in operation_analytics:
-                count = operation_analytics[op_type]['count']
+                count = format_print_number(operation_analytics[op_type]['count'])
                 print(f'operation count: {count}\t type: {op_type}')
 
             for other_data in extra_data:

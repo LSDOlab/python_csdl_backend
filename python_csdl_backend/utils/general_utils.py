@@ -148,6 +148,12 @@ def set_scaler_array(
 
     return return_array
 
+def format_print_number(number):
+    """
+    prints a number to a string with commas
+    """
+    return f"{number:,}"
+
 def analyze_dict_memory(var_dict, name, sim_name):
     import scipy.sparse as sp
     import sys

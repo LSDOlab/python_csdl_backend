@@ -25,7 +25,7 @@ class ImplicitSimWrapper(ImplicitWrapperBase):
             name = ''
             for state in out_res_map:
                 name += state + '__'
-            self.sim = Simulator(op.rep, analytics=0,display_scripts=0, name = name)
+            self.sim = Simulator(op.rep, analytics=0,display_scripts=0, name = name, save_vars=set().union(set(out_res_map.keys()), set(out_in_map.keys()), set(res_out_map.keys()), set(expose)))
 
         # dictionary of information on state
         # Try to keep as many things out of memory after init
@@ -127,7 +127,8 @@ class ImplicitSimWrapper(ImplicitWrapperBase):
         return self.sim[res_name]
 
     def get_state(self, state_name):
-        return self.sim[state_name]
+        state = self.sim[state_name]
+        return state
 
     def compute_totals(self):
         if self.use_vjps:

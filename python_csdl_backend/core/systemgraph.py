@@ -4,7 +4,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from python_csdl_backend.core.codeblock import CodeBlock
-from python_csdl_backend.utils.general_utils import get_deriv_name, to_unique_list, get_path_name, increment_id, lineup_string, get_reverse_seed, get_path_name_vjp
+from python_csdl_backend.utils.general_utils import format_print_number, get_deriv_name, to_unique_list, get_path_name, increment_id, lineup_string, get_reverse_seed, get_path_name_vjp
 from python_csdl_backend.core.operation_map import (
     get_backend_op,
     get_backend_implicit_op,
@@ -16,7 +16,7 @@ from python_csdl_backend.core.state_manager import StateManager
 from python_csdl_backend.operations.parallel.point_to_point import PointToPointCall, SendCall, RecvCall
 from python_csdl_backend.core.instructions import SingleInstruction, MultiInstructions
 
-from csdl import Operation, StandardOperation, ImplicitOperation, CustomExplicitOperation, Variable, Output, BracketedSearchOperation, CustomImplicitOperation
+from csdl import Operation, StandardOperation, ImplicitOperation, CustomExplicitOperation, Variable, Output, BracketedSearchOperation, CustomImplicitOperation, DeclaredVariable
 from csdl.operations.solve_linear import SolveLinear
 from csdl.rep.variable_node import VariableNode
 from csdl.rep.operation_node import OperationNode
@@ -437,10 +437,10 @@ class SystemGraph(object):
 
         average_var_size = total_var_size/num_vars
         extra_data = []
-        extra_data.append(f'average variable size:   {average_var_size}')
-        extra_data.append(f'maximum variable size:   {maximum_var_size_shape[0]} {maximum_var_size_shape[1]} ({maximum_var_size_shape[2]})')
-        extra_data.append(f'number of variables  :   {num_vars}')
-        extra_data.append(f'number of scalars    :   {total_var_size}')
+        extra_data.append(f'average variable size:   {format_print_number(average_var_size)}')
+        extra_data.append(f'maximum variable size:   {format_print_number(maximum_var_size_shape[0])} {maximum_var_size_shape[1]} ({maximum_var_size_shape[2]})')
+        extra_data.append(f'number of variables  :   {format_print_number(num_vars)}')
+        extra_data.append(f'number of scalars    :   {format_print_number(total_var_size)}')
 
         return operation_analytics, extra_data
     
@@ -528,12 +528,13 @@ class SystemGraph(object):
                 keep_this_var = False
                 del_csdl_val = True
                 saved_by_csdl = False
-                if isinstance(csdl_node, Output):
+                if isinstance(csdl_node, (Output, DeclaredVariable)):
                     is_auto_var = False
 
                     if len(node.name) == 1:
                         is_auto_var = False
-                    elif (node.name[0] == '_') and (not node.name[1].isalpha()):
+                    # elif (node.name[0] == '_') and (not node.name[1].isalpha()):
+                    elif (node.name == node.id):
                         # We know if its a CSDL auto var if its named _ABC
                         # where A is an integer (it seems)
                         is_auto_var = True
