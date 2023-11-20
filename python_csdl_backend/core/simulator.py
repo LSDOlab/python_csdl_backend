@@ -1016,17 +1016,33 @@ class Simulator(SimulatorBase):
         unique_id = self._find_unique_id(key)
         if not unique_id:
             # If key is not found then return error
-            raise KeyError(f'Variable {key} not found.')
+            raise KeyError(f'Variable name \'{key}\' not found.')
         else:
+            if not isinstance(val, (np.ndarray, Number)):
+                raise ValueError(f'Cannot set variable \'{key}\' to simulator. Value must be a numpy array or float, got {type(val)}')
+            
+            if isinstance(val, Number):
+                val = np.array(val)
             # set the state values
-            try:
-                val = val.astype('float64')
+            val = val.astype('float64')
+
+            # if value size != state value size, raise error
+            if val.shape == self.state_vals[unique_id].shape:
+                self.state_vals[unique_id] = val
+            elif val.size == self.state_vals[unique_id].size:
                 self.state_vals[unique_id] = val.reshape(self.state_vals[unique_id].shape)
-            except:
-                try:
-                    self.state_vals[unique_id] = (np.ones(self.state_vals[unique_id].shape)*val).astype('float64')
-                except:
-                    raise ValueError(f'Cannot set variable {key} to simulator.')
+            elif val.size == 1:
+                self.state_vals[unique_id] = (np.ones(self.state_vals[unique_id].shape)*val).astype('float64')
+            else:
+                raise ValueError(f'Cannot set variable \'{key}\' to simulator. Value shape {val.shape} is not compatible with variable shape {self.state_vals[unique_id].shape}')
+
+            # try:
+            #     self.state_vals[unique_id] = val.reshape(self.state_vals[unique_id].shape)
+            # except:
+            #     try:
+            #         self.state_vals[unique_id] = (np.ones(self.state_vals[unique_id].shape)*val).astype('float64')
+            #     except:
+            #         raise ValueError(f'Cannot set variable {key} to simulator.')
 
     def _find_unique_id(self, key):
         """
