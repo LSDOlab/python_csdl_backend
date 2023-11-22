@@ -172,6 +172,7 @@ class OperationBase():
                         self.input_csdl_to_rep[csdl_pred] = pred
                         self.input_rep_to_csdl[pred] = csdl_pred
                         self.input_name_to_unique[csdl_pred.name] = pred.id
+                        break
 
                 # otherwise, check if the connection targets are a source
                 for tgt in pred.connected_to:
@@ -187,6 +188,7 @@ class OperationBase():
                             self.input_csdl_to_rep[csdl_pred] = pred
                             self.input_rep_to_csdl[pred] = csdl_pred
                             self.input_name_to_unique[csdl_pred.name] = pred.id
+                            break
 
             # if not a connection or connection target not found, try to match declared variables.
             if found_match == True:
@@ -218,6 +220,7 @@ class OperationBase():
                     self.input_csdl_to_rep[csdl_pred] = pred
                     self.input_rep_to_csdl[pred] = csdl_pred
                     self.input_name_to_unique[csdl_pred.name] = pred.id
+                    break
 
             # If we haven't found a match after looping through all predecessors, throw error
             if not found_match:
