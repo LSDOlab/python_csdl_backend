@@ -751,6 +751,16 @@ class SystemGraph(object):
                     vars = {}  # precomputed variables
                     back_operation.get_evaluation(eval_block_temp, vars)
 
+                    #       UNCOMMENT TO PRINT ALL VARIABLES
+                    # eval_block.write(f'print()')
+                    # eval_block.write(f'print("OPERATION")')
+                    # for key in nx_inputs:
+                    #     eval_block.write(f'try:')
+                    #     eval_block.write(f'\tprint(comm.rank,"{key}=", {key})')
+                    #     eval_block.write(f'except:')
+                    #     eval_block.write(f'\tprint("{key}=", {key})')
+                    #       UNCOMMENT TO PRINT ALL VARIABLES
+
                     # +=+=+=+=+=+=+=+=+=+=+=+=+= write the evaluation procedure +=+=+=+=+=+=+=+=+=+=+=+=+=
                     # update precomputed variables. hopefully all keys are unique.
                     preeval_vars.update(vars)
@@ -769,7 +779,15 @@ class SystemGraph(object):
                     if back_operation.needs_input_reshape:
                         eval_block.write(back_operation.unreshape_block)
                     # +=+=+=+=+=+=+=+=+=+=+=+=+==+= end evaluation procedure +=+=+=+=+=+=+=+=+=+=+=+=+=+=
-            
+                    #       UNCOMMENT TO PRINT ALL VARIABLES
+                    # eval_block.write(f'print("OUTPUT")')
+                    # for key in nx_outputs:
+                    #     eval_block.write(f'try:')
+                    #     eval_block.write(f'\tprint(comm.rank,"{key}-->", {key})')
+                    #     eval_block.write(f'except:')
+                    #     eval_block.write(f'\tprint("{key}-->", {key})')
+                    #       UNCOMMENT TO PRINT ALL VARIABLES
+
             if self.checkpoints_bool:
                 pass
 

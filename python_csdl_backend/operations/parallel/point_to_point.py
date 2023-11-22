@@ -80,7 +80,10 @@ class SendCall(PointToPointCall):
             raise ValueError('origin_rank must be the same as from_rank for MPI Send')
 
     def get_block(self, code_block, vars):
-        code_block.write(f'comm.Send({self.var_id}, dest = {self.to_rank}, tag = {self.tag})')
+        code_block.write(f'comm.Send({self.var_id}.astype("float64") , dest = {self.to_rank}, tag = {self.tag})')
+        
+        # Uncomment to print send value
+        # code_block.write(f'print(comm.rank,"SEND" ,"{self.var_id}",{self.var_id}, {self.var_id}.dtype)')
 
     def get_adjoint_call(self, code_block, vars, adjoint_path_name, adjoint_shape, adjoint_type):
         # vars[adjoint_path_name] = np.ones(adjoint_shape)
@@ -101,6 +104,9 @@ class RecvCall(PointToPointCall):
         # vars[self.var_id] = np.ones(self.var.var.shape)
         code_block.write(f'{self.var_id} = np.ones({self.var.var.shape})')
         code_block.write(f'comm.Recv({self.var_id}, source = {self.from_rank}, tag = {self.tag})')
+        
+        # Uncomment to print recv value
+        # code_block.write(f'print(comm.rank,"RECV" ,"{self.var_id}",{self.var_id}, ({self.var_id}.dtype))')
 
     def get_adjoint_call(self, code_block, vars, adjoint_path_name, adjoint_shape, adjoint_type):
         # code_block.write(f'comm.Send({adjoint_path_name}, dest = {self.from_rank}, tag = {self.tag})')
