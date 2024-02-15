@@ -30,3 +30,15 @@ def test_sum_single_tensor():
         vals_dict={},
         totals_dict={})
 
+def test_sum_single_tensor_small():
+
+    np.random.seed(10)
+    v1 = np.array([[[0.1, 0.2, 0.3], [0.1, 0.2, 0.3]]])
+
+    run_test(
+        SingleTensorRandomSample(v1 = v1),
+        outs=['multiple_tensor_axis_sum'],
+        ins=['T1'],
+        name='test_sum_mult_axis',
+        vals_dict={},
+        totals_dict={})
